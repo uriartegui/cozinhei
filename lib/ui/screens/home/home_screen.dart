@@ -62,6 +62,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       builder: (_) => _ServingsDialog(
         controller: _servingsController,
         onGenerate: (servings) {
+          FocusScope.of(context).unfocus();
           Navigator.pop(context);
           if (chips.isEmpty && _selectedCategory == null && _selectedTags.isEmpty) {
             _showNoIngredientsDialog();

@@ -60,6 +60,7 @@ class _MainScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final index = _currentIndex(context);
     return Scaffold(
+      backgroundColor: Colors.white,
       body: child,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
