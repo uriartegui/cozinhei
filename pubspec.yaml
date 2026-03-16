@@ -1,0 +1,48 @@
+name: cozinhei
+description: Gerador Inteligente de Receitas com IA
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.11.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  uuid: ^4.5.3
+
+  # HTTP
+  dio: ^5.4.0
+
+  # Injeção de dependência
+  get_it: ^7.6.7
+
+  # Banco de dados local
+  drift: ^2.14.1
+  drift_flutter: ^0.1.0
+  sqlite3_flutter_libs: ^0.5.0
+
+  # Imagens
+  cached_network_image: ^3.3.1
+
+  # Estado
+  flutter_riverpod: ^2.4.10
+
+  # Navegação
+  go_router: ^13.2.0
+
+  # Preferências
+  shared_preferences: ^2.2.2
+
+  cupertino_icons: ^1.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  build_runner: ^2.4.8
+  drift_dev: ^2.14.1
+
+flutter:
+  uses-material-design: true
