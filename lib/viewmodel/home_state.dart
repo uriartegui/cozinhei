@@ -26,12 +26,18 @@ class HomeState {
   final FridgeSuggestionsState fridgeSuggestions;
   final String query;
   final List<String> chips;
+  final String? selectedCategory;
+  final String? selectedSubcategory;
+  final Set<String> selectedTags;
 
   HomeState({
     HomeUiState? uiState,
     FridgeSuggestionsState? fridgeSuggestions,
     this.query = '',
     this.chips = const [],
+    this.selectedCategory,
+    this.selectedSubcategory,
+    this.selectedTags = const {},
   })  : uiState = uiState ?? HomeIdle(),
         fridgeSuggestions = fridgeSuggestions ?? FridgeSuggestionsIdle();
 
@@ -40,12 +46,20 @@ class HomeState {
     FridgeSuggestionsState? fridgeSuggestions,
     String? query,
     List<String>? chips,
+    String? selectedCategory,
+    String? selectedSubcategory,
+    Set<String>? selectedTags,
+    bool clearCategory = false,
+    bool clearSubcategory = false,
   }) {
     return HomeState(
       uiState: uiState ?? this.uiState,
       fridgeSuggestions: fridgeSuggestions ?? this.fridgeSuggestions,
       query: query ?? this.query,
       chips: chips ?? this.chips,
+      selectedCategory: clearCategory ? null : selectedCategory ?? this.selectedCategory,
+      selectedSubcategory: clearSubcategory ? null : selectedSubcategory ?? this.selectedSubcategory,
+      selectedTags: selectedTags ?? this.selectedTags,
     );
   }
 }

@@ -94,7 +94,7 @@ class _SavedRecipesScreenState extends ConsumerState<SavedRecipesScreen> {
                     final recipe = recipes[i];
                     return RecipeCard(
                       recipe: recipe,
-                      onClick: () => context.go('/recipe', extra: recipe),
+                      onClick: () => context.push('/recipe', extra: recipe),
                       onToggleFavorite: () => actions.toggleFavorite(
                           recipe.id, recipe.isFavorite),
                       onDelete: () => actions.deleteRecipe(recipe.id),

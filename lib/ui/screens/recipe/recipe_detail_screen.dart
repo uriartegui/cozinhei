@@ -233,7 +233,7 @@ class RecipeDetailScreen extends ConsumerWidget {
             top: MediaQuery.of(context).padding.top + 8,
             left: 12,
             child: GestureDetector(
-              onTap: () => context.pop(),
+              onTap: () => context.canPop() ? context.pop() : context.go('/'),
               child: Container(
                 width: 40,
                 height: 40,

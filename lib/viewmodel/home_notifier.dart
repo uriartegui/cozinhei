@@ -28,6 +28,33 @@ class HomeNotifier extends StateNotifier<HomeState> {
     );
   }
 
+  void setCategory(String? category) {
+    state = state.copyWith(
+      selectedCategory: category,
+      clearCategory: category == null,
+      clearSubcategory: true,
+      selectedTags: {},
+    );
+  }
+
+  void setSubcategory(String? subcategory) {
+    state = state.copyWith(
+      selectedSubcategory: subcategory,
+      clearSubcategory: subcategory == null,
+      selectedTags: {},
+    );
+  }
+
+  void toggleTag(String tag) {
+    final tags = Set<String>.from(state.selectedTags);
+    if (tags.contains(tag)) {
+      tags.remove(tag);
+    } else {
+      tags.add(tag);
+    }
+    state = state.copyWith(selectedTags: tags);
+  }
+
   Future<void> generateRecipes({int servings = 4}) async {
     final q = state.query.trim();
     if (q.isEmpty) return;

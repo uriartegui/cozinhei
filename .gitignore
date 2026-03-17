@@ -44,6 +44,7 @@ app.*.map.json
 
 # API keys — nunca subir no GitHub
 lib/core/constants.dart
+backend/.env
 
 # Claude / Superpowers — não faz parte do app
 .claude/

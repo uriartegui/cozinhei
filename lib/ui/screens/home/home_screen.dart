@@ -21,9 +21,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _inputController = TextEditingController();
   final _servingsController = TextEditingController();
-  String? _selectedCategory;
-  String? _selectedSubcategory;
-  Set<String> _selectedTags = {};
 
   @override
   void dispose() {
@@ -40,22 +37,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  String _buildQuery(List<String> chips) {
+  String _buildQuery(List<String> chips, String? selectedCategory,
+      String? selectedSubcategory, Set<String> selectedTags) {
     final sb = StringBuffer();
     if (chips.isNotEmpty) sb.write(chips.join(', '));
-    if (_selectedCategory != null) {
+    if (selectedCategory != null) {
       if (sb.isNotEmpty) sb.write(' - ');
-      sb.write(_selectedCategory);
-      if (_selectedSubcategory != null) sb.write(': $_selectedSubcategory');
+      sb.write(selectedCategory);
+      if (selectedSubcategory != null) sb.write(': $selectedSubcategory');
     }
-    if (_selectedTags.isNotEmpty) {
+    if (selectedTags.isNotEmpty) {
       if (sb.isNotEmpty) sb.write(' - ');
-      sb.write('estilo: ${_selectedTags.join(', ')}');
+      sb.write('estilo: ${selectedTags.join(', ')}');
     }
     return sb.toString();
   }
 
-  void _showServingsDialog(List<String> chips) {
+  void _showServingsDialog(List<String> chips, String? selectedCategory,
+      String? selectedSubcategory, Set<String> selectedTags) {
     _servingsController.clear();
     showDialog(
       context: context,
@@ -63,12 +62,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         controller: _servingsController,
         onGenerate: (servings) {
           FocusScope.of(context).unfocus();
-          Navigator.pop(context);
-          if (chips.isEmpty && _selectedCategory == null && _selectedTags.isEmpty) {
-            _showNoIngredientsDialog();
+          Navigator.of(context, rootNavigator: true).pop();
+          if (chips.isEmpty && selectedCategory == null && selectedTags.isEmpty) {
+            _showNoIngredientsDialog(selectedCategory, selectedSubcategory, selectedTags);
           } else {
             final notifier = ref.read(homeProvider.notifier);
-            notifier.onQueryChange(_buildQuery(chips));
+            notifier.onQueryChange(
+                _buildQuery(chips, selectedCategory, selectedSubcategory, selectedTags));
             notifier.generateRecipes(servings: servings);
           }
         },
@@ -76,15 +76,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _showNoIngredientsDialog() {
+  void _showNoIngredientsDialog(String? selectedCategory,
+      String? selectedSubcategory, Set<String> selectedTags) {
     showDialog(
       context: context,
       builder: (_) => _NoIngredientsDialog(
         onGenerateWithout: () {
           Navigator.pop(context);
-          final query = _selectedCategory != null
-              ? '$_selectedCategory${_selectedSubcategory != null ? ': $_selectedSubcategory' : ''}'
-              '${_selectedTags.isNotEmpty ? ' - estilo: ${_selectedTags.join(', ')}' : ''}'
+          final query = selectedCategory != null
+              ? '$selectedCategory${selectedSubcategory != null ? ': $selectedSubcategory' : ''}'
+                  '${selectedTags.isNotEmpty ? ' - estilo: ${selectedTags.join(', ')}' : ''}'
               : 'receitas variadas';
           final notifier = ref.read(homeProvider.notifier);
           notifier.onQueryChange(query);
@@ -101,7 +102,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final chips = state.chips;
     final uiState = state.uiState;
     final fridgeSuggestions = state.fridgeSuggestions;
-    final currentCategory = allCategories.where((c) => c.name == _selectedCategory).firstOrNull;
+    final selectedCategory = state.selectedCategory;
+    final selectedSubcategory = state.selectedSubcategory;
+    final selectedTags = state.selectedTags;
+    final currentCategory =
+        allCategories.where((c) => c.name == selectedCategory).firstOrNull;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -160,17 +165,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     separatorBuilder: (_, __) => const SizedBox(width: 8),
                     itemBuilder: (_, i) {
                       final cat = allCategories[i];
-                      final isSelected = _selectedCategory == cat.name;
+                      final isSelected = selectedCategory == cat.name;
                       return GestureDetector(
-                        onTap: () => setState(() {
+                        onTap: () {
                           if (isSelected) {
-                            _selectedCategory = null;
-                            _selectedSubcategory = null;
+                            notifier.setCategory(null);
                           } else {
-                            _selectedCategory = cat.name;
-                            _selectedSubcategory = null;
+                            notifier.setCategory(cat.name);
                           }
-                        }),
+                        },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 8),
@@ -205,11 +208,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       separatorBuilder: (_, __) => const SizedBox(width: 8),
                       itemBuilder: (_, i) {
                         final sub = currentCategory.subcategories[i];
-                        final isSelected = _selectedSubcategory == sub;
+                        final isSelected = selectedSubcategory == sub;
                         return GestureDetector(
-                          onTap: () => setState(() {
-                            _selectedSubcategory = isSelected ? null : sub;
-                          }),
+                          onTap: () {
+                            notifier.setSubcategory(isSelected ? null : sub);
+                          },
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 6),
@@ -242,21 +245,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
 
                 // Tags
-                if (_selectedSubcategory != null) ...[
+                if (selectedSubcategory != null) ...[
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: allTags.map((tag) {
-                      final isSelected = _selectedTags.contains(tag);
+                      final isSelected = selectedTags.contains(tag);
                       return GestureDetector(
-                        onTap: () => setState(() {
-                          if (isSelected) {
-                            _selectedTags = {..._selectedTags}..remove(tag);
-                          } else {
-                            _selectedTags = {..._selectedTags, tag};
-                          }
-                        }),
+                        onTap: () => notifier.toggleTag(tag),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
@@ -293,17 +290,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
                             borderSide:
-                            const BorderSide(color: Color(0xFFE0E0E0)),
+                                const BorderSide(color: Color(0xFFE0E0E0)),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
                             borderSide:
-                            const BorderSide(color: Color(0xFFE0E0E0)),
+                                const BorderSide(color: Color(0xFFE0E0E0)),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
-                            borderSide:
-                            const BorderSide(color: brandOrange),
+                            borderSide: const BorderSide(color: brandOrange),
                           ),
                           filled: true,
                           fillColor: surfaceGray,
@@ -337,27 +333,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     runSpacing: 8,
                     children: chips
                         .map((chip) => Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        gradient: brandGradient,
-                        borderRadius: BorderRadius.circular(50),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(chip,
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 12)),
-                          const SizedBox(width: 4),
-                          GestureDetector(
-                            onTap: () => notifier.removeChip(chip),
-                            child: const Icon(Icons.close,
-                                color: Colors.white, size: 14),
-                          ),
-                        ],
-                      ),
-                    ))
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                gradient: brandGradient,
+                                borderRadius: BorderRadius.circular(50),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(chip,
+                                      style: const TextStyle(
+                                          color: Colors.white, fontSize: 12)),
+                                  const SizedBox(width: 4),
+                                  GestureDetector(
+                                    onTap: () => notifier.removeChip(chip),
+                                    child: const Icon(Icons.close,
+                                        color: Colors.white, size: 14),
+                                  ),
+                                ],
+                              ),
+                            ))
                         .toList(),
                   ),
                 ],
@@ -367,7 +363,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 // Generate button
                 GestureDetector(
                   onTap: uiState is! HomeLoading
-                      ? () => _showServingsDialog(chips)
+                      ? () => _showServingsDialog(
+                          chips, selectedCategory, selectedSubcategory, selectedTags)
                       : null,
                   child: Container(
                     height: 52,
@@ -376,9 +373,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         colors: uiState is! HomeLoading
                             ? [brandOrange, brandOrangePink]
                             : [
-                          brandOrange.withOpacity(0.4),
-                          brandOrangePink.withOpacity(0.4)
-                        ],
+                                brandOrange.withOpacity(0.4),
+                                brandOrangePink.withOpacity(0.4)
+                              ],
                       ),
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -424,8 +421,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     child: Text(uiState.message,
                         style: TextStyle(
-                            color:
-                            Theme.of(context).colorScheme.error)),
+                            color: Theme.of(context).colorScheme.error)),
                   ),
 
                 // Success header
@@ -444,7 +440,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ],
                   ),
                   OutlinedButton.icon(
-                    onPressed: () => _showServingsDialog(chips),
+                    onPressed: () => _showServingsDialog(
+                        chips, selectedCategory, selectedSubcategory, selectedTags),
                     icon: const Icon(Icons.auto_awesome,
                         color: brandOrange, size: 16),
                     label: const Text('Gerar outras',
@@ -465,23 +462,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           if (uiState is HomeSuccess)
             SliverPadding(
               padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               sliver: SliverGrid(
                 gridDelegate:
-                const SliverGridDelegateWithFixedCrossAxisCount(
+                    const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                   childAspectRatio: 0.72,
                 ),
                 delegate: SliverChildBuilderDelegate(
-                      (_, i) {
+                  (_, i) {
                     final recipe = uiState.recipes[i];
                     return RecipeCard(
                       recipe: recipe,
                       onClick: () {
                         notifier.saveRecipe(recipe);
-                        context.go('/recipe', extra: recipe);
+                        context.push('/recipe', extra: recipe);
                       },
                       onToggleFavorite: () {},
                       onDelete: () {},
@@ -530,7 +527,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             return GestureDetector(
               onTap: () {
                 notifier.saveRecipe(recipe);
-                context.go('/recipe', extra: recipe);
+                context.push('/recipe', extra: recipe);
               },
               child: Container(
                 width: 130,
@@ -544,18 +541,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   children: [
                     recipe.imageUrl != null
                         ? CachedNetworkImage(
-                      imageUrl: recipe.imageUrl!,
-                      height: 80,
-                      width: 130,
-                      fit: BoxFit.cover,
-                    )
+                            imageUrl: recipe.imageUrl!,
+                            height: 80,
+                            width: 130,
+                            fit: BoxFit.cover,
+                          )
                         : Container(
-                      height: 80,
-                      color: const Color(0xFFEEEEEE),
-                      child: const Center(
-                          child: Icon(Icons.restaurant,
-                              color: Colors.grey)),
-                    ),
+                            height: 80,
+                            color: const Color(0xFFEEEEEE),
+                            child: const Center(
+                                child: Icon(Icons.restaurant,
+                                    color: Colors.grey)),
+                          ),
                     Padding(
                       padding: const EdgeInsets.all(8),
                       child: Column(
@@ -679,7 +676,7 @@ class _ServingsDialog extends StatelessWidget {
             GestureDetector(
               onTap: () {
                 final servings =
-                (int.tryParse(controller.text) ?? 4).clamp(1, 100);
+                    (int.tryParse(controller.text) ?? 4).clamp(1, 100);
                 onGenerate(servings);
               },
               child: Container(
@@ -759,7 +756,7 @@ class _NoIngredientsDialog extends StatelessWidget {
             const Text('Nenhum ingrediente\nadicionado',
                 textAlign: TextAlign.center,
                 style:
-                TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             const SizedBox(height: 12),
             RichText(
               textAlign: TextAlign.center,
@@ -795,7 +792,7 @@ class _NoIngredientsDialog extends StatelessWidget {
                   children: [
                     TextSpan(
                         text:
-                        'Caso queira continuar sem ingredientes, clique em '),
+                            'Caso queira continuar sem ingredientes, clique em '),
                     TextSpan(
                         text: '"Gerar sem ingrediente".',
                         style: TextStyle(
