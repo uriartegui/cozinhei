@@ -27,6 +27,10 @@ class UserRecipeRepository {
       imageUrl: Value(recipe.imageUrl),
       isPublic: Value(recipe.isPublic),
       createdAt: recipe.createdAt,
+      authorName: Value(recipe.authorName),
+      category: Value(recipe.category),
+      subcategory: Value(recipe.subcategory),
+      tags: Value(jsonEncode(recipe.tags)),
     ));
   }
 
@@ -39,6 +43,9 @@ class UserRecipeRepository {
     final steps = (jsonDecode(e.steps) as List)
         .map((s) => UserRecipeStep.fromJson(s as Map<String, dynamic>))
         .toList();
+    final tags = e.tags != null
+        ? List<String>.from(jsonDecode(e.tags!) as List)
+        : <String>[];
     return UserRecipe(
       id: e.id,
       name: e.name,
@@ -49,6 +56,10 @@ class UserRecipeRepository {
       imageUrl: e.imageUrl,
       isPublic: e.isPublic,
       createdAt: e.createdAt,
+      authorName: e.authorName,
+      category: e.category,
+      subcategory: e.subcategory,
+      tags: tags,
     );
   }
 }

@@ -16,4 +16,19 @@ class GroqService {
     );
     return ChatResponse.fromJson(response.data);
   }
+
+  Future<String> generateRaw(String prompt) async {
+    final response = await _dio.post(
+      'https://api.groq.com/openai/v1/chat/completions',
+      data: {
+        'model': 'llama-3.3-70b-versatile',
+        'messages': [
+          {'role': 'user', 'content': prompt}
+        ],
+        'temperature': 0.1,
+      },
+      options: Options(headers: {'Authorization': 'Bearer $_apiKey'}),
+    );
+    return response.data['choices'][0]['message']['content'] as String;
+  }
 }

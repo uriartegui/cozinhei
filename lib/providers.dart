@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'data/repository/recipe_repository.dart';
 import 'data/repository/fridge_repository.dart';
+import 'data/repository/community_recipe_repository.dart';
 import 'model/recipe.dart';
 import 'viewmodel/home_notifier.dart';
 import 'viewmodel/home_state.dart';
@@ -25,6 +26,7 @@ final homeProvider = StateNotifierProvider<HomeNotifier, HomeState>((ref) {
   return HomeNotifier(
     ref.read(recipeRepositoryProvider),
     ref.read(fridgeRepositoryProvider),
+    ref.read(communityRecipeRepositoryProvider),
   );
 });
 
@@ -45,6 +47,11 @@ final savedRecipesProvider = StreamProvider<List<Recipe>>((ref) {
 final favoriteRecipesProvider = StreamProvider<List<Recipe>>((ref) {
   return ref.read(recipeRepositoryProvider).getFavoriteRecipes();
 });
+
+// ── Community Recipes ────────────────────────────────────────────────────────
+final communityRecipeRepositoryProvider = Provider<CommunityRecipeRepository>(
+      (ref) => getIt<CommunityRecipeRepository>(),
+);
 
 // ── User Recipes (Caderno) ──────────────────────────────────────────────────
 final userRecipeRepositoryProvider = Provider<UserRecipeRepository>(

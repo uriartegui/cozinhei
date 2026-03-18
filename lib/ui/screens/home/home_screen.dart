@@ -22,6 +22,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _servingsController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(homeProvider.notifier).loadFridgeSuggestions();
+    });
+  }
+
+  @override
   void dispose() {
     _inputController.dispose();
     _servingsController.dispose();
@@ -63,7 +71,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           FocusScope.of(context).unfocus();
           Navigator.of(context, rootNavigator: true).pop();
           if (chips.isEmpty && selectedCategory == null && selectedTags.isEmpty) {
-            _showNoIngredientsDialog(selectedCategory, selectedSubcategory, selectedTags);
+            _showNoIngredientsDialog(selectedCategory, selectedSubcategory, selectedTags, servings);
           } else {
             final notifier = ref.read(homeProvider.notifier);
             notifier.onQueryChange(
@@ -76,19 +84,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _showNoIngredientsDialog(String? selectedCategory,
-      String? selectedSubcategory, Set<String> selectedTags) {
+      String? selectedSubcategory, Set<String> selectedTags, int servings) {
     showDialog(
       context: context,
-      builder: (_) => _NoIngredientsDialog(
+      builder: (dialogContext) => _NoIngredientsDialog(
         onGenerateWithout: () {
-          Navigator.pop(context);
+          Navigator.of(dialogContext).pop();
           final query = selectedCategory != null
               ? '$selectedCategory${selectedSubcategory != null ? ': $selectedSubcategory' : ''}'
                   '${selectedTags.isNotEmpty ? ' - estilo: ${selectedTags.join(', ')}' : ''}'
               : 'receitas variadas';
           final notifier = ref.read(homeProvider.notifier);
           notifier.onQueryChange(query);
-          notifier.generateRecipes();
+          notifier.generateRecipes(servings: servings);
         },
       ),
     );

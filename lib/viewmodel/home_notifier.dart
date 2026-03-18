@@ -1,15 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/repository/recipe_repository.dart';
 import '../data/repository/fridge_repository.dart';
+import '../data/repository/community_recipe_repository.dart';
 import '../model/recipe.dart';
 import 'home_state.dart';
 
 class HomeNotifier extends StateNotifier<HomeState> {
   final RecipeRepository _repository;
   final FridgeRepository _fridgeRepository;
+  final CommunityRecipeRepository _communityRepository;
   final List<String> _shownRecipeNames = [];
+  final List<String> _shownFridgeNames = [];
 
-  HomeNotifier(this._repository, this._fridgeRepository)
+  HomeNotifier(this._repository, this._fridgeRepository, this._communityRepository)
       : super(HomeState());
 
   void onQueryChange(String value) {
@@ -61,13 +64,36 @@ class HomeNotifier extends StateNotifier<HomeState> {
 
     state = state.copyWith(uiState: HomeLoading());
     try {
-      final recipes = await _repository.generateRecipes(
-        ingredients: q,
-        servings: servings,
-        excludeNames: List.from(_shownRecipeNames),
+      // 1. Busca na comunidade — usa só os chips de ingredientes como keyword;
+      //    o filtro de categoria é passado separadamente para a RPC.
+      final ingredientQuery = state.chips.join(', ');
+      final allCommunity = await _communityRepository.searchByQuery(
+        ingredientQuery,
+        category: state.selectedCategory,
       );
-      _shownRecipeNames.addAll(recipes.map((r) => r.name));
-      state = state.copyWith(uiState: HomeSuccess(recipes));
+      final communityRecipes = allCommunity
+          .where((r) => !_shownRecipeNames.contains(r.name))
+          .toList();
+
+      // 2. Completa com IA se tiver menos de 4 receitas
+      final needed = 4 - communityRecipes.length;
+      final excludeNames = [
+        ...List<String>.from(_shownRecipeNames),
+        ...communityRecipes.map((r) => r.name),
+      ];
+
+      final aiRecipes = needed > 0
+          ? await _repository.generateRecipes(
+              ingredients: q,
+              count: needed,
+              servings: servings,
+              excludeNames: excludeNames,
+            )
+          : <Recipe>[];
+
+      final combined = [...communityRecipes, ...aiRecipes];
+      _shownRecipeNames.addAll(combined.map((r) => r.name));
+      state = state.copyWith(uiState: HomeSuccess(combined));
     } catch (e) {
       state = state.copyWith(
         uiState: HomeError(e.toString().replaceAll('Exception: ', '')),
@@ -83,10 +109,33 @@ class HomeNotifier extends StateNotifier<HomeState> {
     }
     state = state.copyWith(fridgeSuggestions: FridgeSuggestionsLoading());
     try {
-      final recipes = await _repository.generateFridgeSuggestions(
-        (ingredients..shuffle()).take(6).toList(),
+      final sample = (List<String>.from(ingredients)..shuffle()).take(6).toList();
+
+      // Busca comunidade primeiro, excluindo receitas já mostradas
+      final ingredientQuery = sample.take(3).join(', ');
+      final allCommunity = await _communityRepository.searchByQuery(ingredientQuery);
+      final communityResults = allCommunity
+          .where((r) => !_shownFridgeNames.contains(r.name))
+          .take(3)
+          .toList();
+
+      // Completa com IA até 3 no total
+      final needed = 3 - communityResults.length;
+      final excludeNames = [
+        ...List<String>.from(_shownFridgeNames),
+        ...communityResults.map((r) => r.name),
+      ];
+      final aiRecipes = needed > 0
+          ? (await _repository.generateFridgeSuggestions(sample, excludeNames: excludeNames))
+              .take(needed)
+              .toList()
+          : <Recipe>[];
+
+      final combined = [...communityResults, ...aiRecipes];
+      _shownFridgeNames.addAll(combined.map((r) => r.name));
+      state = state.copyWith(
+        fridgeSuggestions: FridgeSuggestionsSuccess(combined),
       );
-      state = state.copyWith(fridgeSuggestions: FridgeSuggestionsSuccess(recipes));
     } catch (_) {
       state = state.copyWith(fridgeSuggestions: FridgeSuggestionsEmpty());
     }

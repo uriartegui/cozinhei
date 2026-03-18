@@ -4,6 +4,7 @@ import '../../../model/recipe.dart';
 import '../../../model/user_recipe.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/step_timer_widget.dart';
+import 'package:share_plus/share_plus.dart';
 
 class UserRecipeDetailScreen extends StatelessWidget {
   final UserRecipe recipe;
@@ -47,6 +48,11 @@ class UserRecipeDetailScreen extends StatelessWidget {
             ),
             actions: [
               IconButton(
+                icon: const Icon(Icons.share_outlined, color: Colors.white),
+                tooltip: 'Compartilhar',
+                onPressed: () => _shareRecipe(recipe),
+              ),
+              IconButton(
                 icon: const Icon(Icons.edit_outlined, color: Colors.white),
                 tooltip: 'Editar receita',
                 onPressed: () => context.push('/recipe-editor', extra: recipe),
@@ -87,17 +93,25 @@ class UserRecipeDetailScreen extends StatelessWidget {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Row(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   _badge(Icons.list_alt, '${recipe.steps.length} passos'),
-                  const SizedBox(width: 8),
                   _badge(Icons.kitchen_outlined,
                       '${recipe.ingredients.length} ingredientes'),
-                  if (recipe.isPublic) ...[
-                    const SizedBox(width: 8),
-                    _badge(Icons.public, 'Pública',
-                        color: badgeGreen),
-                  ],
+                  if (recipe.isPublic)
+                    _badge(Icons.public, 'Pública', color: badgeGreen),
+                  if (recipe.category != null)
+                    _badge(Icons.category_outlined, recipe.category!,
+                        color: brandOrange),
+                  if (recipe.subcategory != null)
+                    _badge(Icons.label_outline, recipe.subcategory!,
+                        color: const Color(0xFFE07B39)),
+                  ...recipe.tags.map(
+                    (tag) => _badge(Icons.local_offer_outlined, tag,
+                        color: const Color(0xFF888888)),
+                  ),
                 ],
               ),
             ),
@@ -259,5 +273,27 @@ class UserRecipeDetailScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  void _shareRecipe(UserRecipe r) {
+    final buf = StringBuffer();
+    buf.writeln('${r.coverEmoji} ${r.name}');
+    if (r.description != null && r.description!.isNotEmpty) {
+      buf.writeln(r.description);
+    }
+    buf.writeln();
+    buf.writeln('📝 Ingredientes:');
+    for (final i in r.ingredients) {
+      buf.writeln('• $i');
+    }
+    buf.writeln();
+    buf.writeln('👨‍🍳 Modo de preparo:');
+    for (int i = 0; i < r.steps.length; i++) {
+      buf.writeln('${i + 1}. ${r.steps[i].description}');
+    }
+    buf.writeln();
+    buf.writeln('Feito com Cozinhei 🍽️');
+
+    Share.share(buf.toString());
   }
 }

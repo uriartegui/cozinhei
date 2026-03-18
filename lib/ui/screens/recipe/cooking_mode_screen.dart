@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import '../../theme/app_colors.dart';
 import '../../../model/recipe.dart';
 import '../../widgets/step_timer_widget.dart';
@@ -24,157 +23,240 @@ class _CookingModeScreenState extends State<CookingModeScreen> {
   @override
   Widget build(BuildContext context) {
     final steps = widget.recipe.steps;
-    final progress = (_currentStep + 1) / steps.length;
+    final stepText = _cleanStep(steps[_currentStep]);
+    final secs = parseStepSeconds(steps[_currentStep]);
+    final isLast = _currentStep == steps.length - 1;
+    final top = MediaQuery.of(context).padding.top;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.recipe.name,
-            style: const TextStyle(color: Colors.white)),
-        backgroundColor: brandOrange,
-        leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
-          onPressed: () => context.pop(),
-        ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Progresso
-            Column(
+      backgroundColor: brandOrangeLight,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+
+          // ── Header ──────────────────────────────────────────
+          Container(
+            color: Colors.white,
+            padding: EdgeInsets.fromLTRB(20, top + 16, 20, 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Passo ${_currentStep + 1} de ${steps.length}',
-                  style: const TextStyle(
-                    color: brandOrange,
-                    fontWeight: FontWeight.bold,
+                // Botão voltar
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: const Padding(
+                    padding: EdgeInsets.only(top: 2, right: 12),
+                    child: Icon(Icons.arrow_back_ios,
+                        size: 20, color: Color(0xFF333333)),
                   ),
                 ),
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
-                  value: progress,
-                  backgroundColor: surfaceGray,
-                  color: brandOrange,
-                  minHeight: 6,
-                  borderRadius: BorderRadius.circular(4),
+
+                // Info da receita
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.recipe.name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1C1C1E),
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          if (widget.recipe.servings.isNotEmpty &&
+                              widget.recipe.servings != '-') ...[
+                            const Icon(Icons.people_outline,
+                                size: 14, color: textMedium),
+                            const SizedBox(width: 4),
+                            Text(widget.recipe.servings,
+                                style: const TextStyle(
+                                    fontSize: 13, color: textMedium)),
+                            const SizedBox(width: 16),
+                          ],
+                          if (widget.recipe.cookingTime.isNotEmpty &&
+                              widget.recipe.cookingTime != '-') ...[
+                            const Icon(Icons.schedule,
+                                size: 14, color: textMedium),
+                            const SizedBox(width: 4),
+                            Text(widget.recipe.cookingTime,
+                                style: const TextStyle(
+                                    fontSize: 13, color: textMedium)),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Contador de passo
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${_currentStep + 1}/${steps.length}',
+                      style: const TextStyle(
+                        color: brandOrange,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text('passos',
+                        style: TextStyle(fontSize: 11, color: textMedium)),
+                  ],
                 ),
               ],
             ),
+          ),
 
-            // Conteúdo do passo
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              transitionBuilder: (child, animation) => SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(1, 0),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: FadeTransition(opacity: animation, child: child),
-              ),
-              child: Column(
-                key: ValueKey(_currentStep),
+          // Barra de progresso
+          LinearProgressIndicator(
+            value: (_currentStep + 1) / steps.length,
+            backgroundColor: const Color(0xFFEDE8E3),
+            valueColor: const AlwaysStoppedAnimation(brandOrange),
+            minHeight: 3,
+          ),
+
+          // ── Conteúdo do passo ────────────────────────────────
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              layoutBuilder: (currentChild, previousChildren) => Stack(
+                alignment: Alignment.topLeft,
                 children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: const BoxDecoration(
-                      color: brandOrange,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${_currentStep + 1}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 36,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    child: Container(
-                      width: double.infinity,
-                      constraints: const BoxConstraints(minHeight: 120),
-                      padding: const EdgeInsets.all(24),
-                      child: Center(
-                        child: Text(
-                          _cleanStep(steps[_currentStep]),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            height: 1.6,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Builder(builder: (_) {
-                    final secs = parseStepSeconds(steps[_currentStep]);
-                    if (secs == null) return const SizedBox.shrink();
-                    return StepTimerWidget(totalSeconds: secs, large: true);
-                  }),
+                  ...previousChildren,
+                  if (currentChild != null) currentChild,
                 ],
               ),
-            ),
+              transitionBuilder: (child, anim) => FadeTransition(
+              opacity: anim,
+                child: SlideTransition(
+                  position: Tween(
+                    begin: const Offset(0, 0.03),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(
+                      parent: anim, curve: Curves.easeOut)),
+                  child: child,
+                ),
+              ),
+              child: SingleChildScrollView(
+                key: ValueKey(_currentStep),
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Label
+                    Text(
+                      'Passo ${_currentStep + 1}',
+                      style: const TextStyle(
+                        color: brandOrange,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
 
-            // Botões de navegação
-            Row(
+                    // Texto
+                    Text(
+                      stepText,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        height: 1.7,
+                        color: Color(0xFF1C1C1E),
+                      ),
+                    ),
+
+                    // Timer
+                    if (secs != null) ...[
+                      const SizedBox(height: 24),
+                      const Divider(color: Color(0xFFE5E0DA)),
+                      const SizedBox(height: 20),
+                      StepTimerWidget(totalSeconds: secs, large: true),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // ── Navegação ────────────────────────────────────────
+          Container(
+            padding: EdgeInsets.fromLTRB(
+                20, 12, 20, MediaQuery.of(context).padding.bottom + 16),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(
+                  top: BorderSide(color: Color(0xFFEDE8E3), width: 1)),
+            ),
+            child: Row(
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _currentStep > 0
-                        ? () => setState(() => _currentStep--)
-                        : null,
-                    icon: const Icon(Icons.arrow_back),
-                    label: const Text('Anterior'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                if (_currentStep > 0) ...[
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => setState(() => _currentStep--),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(50),
+                        side: const BorderSide(color: Color(0xFFDDD8D3)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.arrow_back_ios,
+                              size: 12, color: Color(0xFF666666)),
+                          SizedBox(width: 4),
+                          Text('Anterior',
+                              style: TextStyle(color: Color(0xFF666666))),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 16),
+                  const SizedBox(width: 12),
+                ],
                 Expanded(
-                  child: _currentStep < steps.length - 1
-                      ? ElevatedButton.icon(
-                    onPressed: () => setState(() => _currentStep++),
-                    icon: const Text('Próximo'),
-                    label: const Icon(Icons.arrow_forward),
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: isLast
+                        ? () => Navigator.pop(context)
+                        : () => setState(() => _currentStep++),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: brandOrange,
+                      backgroundColor: isLast ? badgeGreen : brandOrange,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      minimumSize: const Size.fromHeight(50),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(14)),
+                      elevation: 0,
                     ),
-                  )
-                      : ElevatedButton(
-                    onPressed: () => context.pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          isLast ? 'Finalizar' : 'Próximo',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(
+                          isLast ? Icons.check : Icons.arrow_forward_ios,
+                          size: 13,
+                        ),
+                      ],
                     ),
-                    child: const Text('Finalizar! 🎉',
-                        style:
-                        TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

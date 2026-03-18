@@ -195,17 +195,17 @@ class _RecipeListItem extends StatelessWidget {
                       color: textMedium, size: 20),
                   onPressed: () => showDialog(
                     context: context,
-                    builder: (_) => AlertDialog(
+                    builder: (dialogContext) => AlertDialog(
                       title: const Text('Excluir receita?'),
                       content: Text(
                           'Tem certeza que quer excluir "${recipe.name}"?'),
                       actions: [
                         TextButton(
-                            onPressed: () => Navigator.pop(context),
+                            onPressed: () => Navigator.of(dialogContext).pop(),
                             child: const Text('Cancelar')),
                         TextButton(
                             onPressed: () {
-                              Navigator.pop(context);
+                              Navigator.of(dialogContext).pop();
                               onDelete();
                             },
                             child: const Text('Excluir',

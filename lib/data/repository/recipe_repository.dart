@@ -22,8 +22,11 @@ class RecipeRepository {
 
   // ── Fridge Suggestions ────────────────────────────────────────────────────
 
-  Future<List<Recipe>> generateFridgeSuggestions(List<String> ingredients) async {
-    return await _generateFridgeSuggestionsWithAI(ingredients);
+  Future<List<Recipe>> generateFridgeSuggestions(
+    List<String> ingredients, {
+    List<String> excludeNames = const [],
+  }) async {
+    return await _generateFridgeSuggestionsWithAI(ingredients, excludeNames: excludeNames);
   }
 
   // ── Main Recipe Generation ────────────────────────────────────────────────
@@ -98,8 +101,14 @@ Regras:
     }));
   }
 
-  Future<List<Recipe>> _generateFridgeSuggestionsWithAI(List<String> ingredients) async {
+  Future<List<Recipe>> _generateFridgeSuggestionsWithAI(
+    List<String> ingredients, {
+    List<String> excludeNames = const [],
+  }) async {
     final ingredientList = ingredients.join(', ');
+    final excludeClause = excludeNames.isNotEmpty
+        ? '\n- NÃO sugira nenhuma dessas receitas que já foram mostradas: ${excludeNames.join(', ')}'
+        : '';
     final prompt = '''
 Tenho estes ingredientes disponíveis: $ingredientList
 Crie 3 receitas usando APENAS ingredientes que fazem sentido juntos.
@@ -107,7 +116,7 @@ Regras obrigatórias:
 - NUNCA misture proteínas diferentes na mesma receita
 - Cada receita usa apenas 2 a 4 dos ingredientes disponíveis
 - Pode complementar com temperos básicos (sal, alho, azeite, cebola, manteiga)
-- As 3 receitas devem ser diferentes entre si
+- As 3 receitas devem ser diferentes entre si$excludeClause
 Responda APENAS com um JSON array válido:
 [
   {

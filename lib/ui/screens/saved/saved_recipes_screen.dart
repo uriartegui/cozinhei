@@ -38,7 +38,7 @@ class _SavedRecipesScreenState extends ConsumerState<SavedRecipesScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Minhas Receitas',
+                Text('Receitas Salvas',
                     style: Theme.of(context)
                         .textTheme
                         .headlineSmall
@@ -87,7 +87,7 @@ class _SavedRecipesScreenState extends ConsumerState<SavedRecipesScreen> {
                     crossAxisCount: 2,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
-                    childAspectRatio: 0.72,
+                    childAspectRatio: 0.70,
                   ),
                   itemCount: recipes.length,
                   itemBuilder: (_, i) {

@@ -20,7 +20,9 @@ class RecipeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final category = HomeNotifier.getCategory(recipe.name);
+    final category = recipe.categories.isNotEmpty
+        ? recipe.categories.first
+        : HomeNotifier.getCategory(recipe.name);
 
     return GestureDetector(
       onTap: onClick,
@@ -59,7 +61,7 @@ class RecipeCard extends StatelessWidget {
                           )
                         : _placeholder(),
                   ),
-                  if (category != 'Outras')
+                  if (category != 'Outras' || recipe.categories.isNotEmpty)
                     Positioned(
                       top: 8,
                       left: 8,
@@ -131,7 +133,23 @@ class RecipeCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    if (recipe.source != null) ...[
+                    if (recipe.authorName.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          const Icon(Icons.person_outline, size: 12, color: textMedium),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              recipe.authorName,
+                              style: const TextStyle(color: textMedium, fontSize: 11),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else if (recipe.source != null) ...[
                       const SizedBox(height: 2),
                       Row(
                         children: [

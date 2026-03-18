@@ -777,6 +777,50 @@ class $UserRecipesTable extends UserRecipes
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _authorNameMeta = const VerificationMeta(
+    'authorName',
+  );
+  @override
+  late final GeneratedColumn<String> authorName = GeneratedColumn<String>(
+    'author_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _subcategoryMeta = const VerificationMeta(
+    'subcategory',
+  );
+  @override
+  late final GeneratedColumn<String> subcategory = GeneratedColumn<String>(
+    'subcategory',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
+  @override
+  late final GeneratedColumn<String> tags = GeneratedColumn<String>(
+    'tags',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -788,6 +832,10 @@ class $UserRecipesTable extends UserRecipes
     imageUrl,
     isPublic,
     createdAt,
+    authorName,
+    category,
+    subcategory,
+    tags,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -868,6 +916,33 @@ class $UserRecipesTable extends UserRecipes
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('author_name')) {
+      context.handle(
+        _authorNameMeta,
+        authorName.isAcceptableOrUnknown(data['author_name']!, _authorNameMeta),
+      );
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
+    if (data.containsKey('subcategory')) {
+      context.handle(
+        _subcategoryMeta,
+        subcategory.isAcceptableOrUnknown(
+          data['subcategory']!,
+          _subcategoryMeta,
+        ),
+      );
+    }
+    if (data.containsKey('tags')) {
+      context.handle(
+        _tagsMeta,
+        tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
+      );
+    }
     return context;
   }
 
@@ -913,6 +988,22 @@ class $UserRecipesTable extends UserRecipes
         DriftSqlType.int,
         data['${effectivePrefix}created_at'],
       )!,
+      authorName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}author_name'],
+      )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      ),
+      subcategory: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}subcategory'],
+      ),
+      tags: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags'],
+      )!,
     );
   }
 
@@ -933,6 +1024,10 @@ class UserRecipeEntity extends DataClass
   final String? imageUrl;
   final bool isPublic;
   final int createdAt;
+  final String authorName;
+  final String? category;
+  final String? subcategory;
+  final String tags;
   const UserRecipeEntity({
     required this.id,
     required this.name,
@@ -943,6 +1038,10 @@ class UserRecipeEntity extends DataClass
     this.imageUrl,
     required this.isPublic,
     required this.createdAt,
+    required this.authorName,
+    this.category,
+    this.subcategory,
+    required this.tags,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -960,6 +1059,14 @@ class UserRecipeEntity extends DataClass
     }
     map['is_public'] = Variable<bool>(isPublic);
     map['created_at'] = Variable<int>(createdAt);
+    map['author_name'] = Variable<String>(authorName);
+    if (!nullToAbsent || category != null) {
+      map['category'] = Variable<String>(category);
+    }
+    if (!nullToAbsent || subcategory != null) {
+      map['subcategory'] = Variable<String>(subcategory);
+    }
+    map['tags'] = Variable<String>(tags);
     return map;
   }
 
@@ -978,6 +1085,14 @@ class UserRecipeEntity extends DataClass
           : Value(imageUrl),
       isPublic: Value(isPublic),
       createdAt: Value(createdAt),
+      authorName: Value(authorName),
+      category: category == null && nullToAbsent
+          ? const Value.absent()
+          : Value(category),
+      subcategory: subcategory == null && nullToAbsent
+          ? const Value.absent()
+          : Value(subcategory),
+      tags: Value(tags),
     );
   }
 
@@ -996,6 +1111,10 @@ class UserRecipeEntity extends DataClass
       imageUrl: serializer.fromJson<String?>(json['imageUrl']),
       isPublic: serializer.fromJson<bool>(json['isPublic']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
+      authorName: serializer.fromJson<String>(json['authorName']),
+      category: serializer.fromJson<String?>(json['category']),
+      subcategory: serializer.fromJson<String?>(json['subcategory']),
+      tags: serializer.fromJson<String>(json['tags']),
     );
   }
   @override
@@ -1011,6 +1130,10 @@ class UserRecipeEntity extends DataClass
       'imageUrl': serializer.toJson<String?>(imageUrl),
       'isPublic': serializer.toJson<bool>(isPublic),
       'createdAt': serializer.toJson<int>(createdAt),
+      'authorName': serializer.toJson<String>(authorName),
+      'category': serializer.toJson<String?>(category),
+      'subcategory': serializer.toJson<String?>(subcategory),
+      'tags': serializer.toJson<String>(tags),
     };
   }
 
@@ -1024,6 +1147,10 @@ class UserRecipeEntity extends DataClass
     Value<String?> imageUrl = const Value.absent(),
     bool? isPublic,
     int? createdAt,
+    String? authorName,
+    Value<String?> category = const Value.absent(),
+    Value<String?> subcategory = const Value.absent(),
+    String? tags,
   }) => UserRecipeEntity(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -1034,6 +1161,10 @@ class UserRecipeEntity extends DataClass
     imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
     isPublic: isPublic ?? this.isPublic,
     createdAt: createdAt ?? this.createdAt,
+    authorName: authorName ?? this.authorName,
+    category: category.present ? category.value : this.category,
+    subcategory: subcategory.present ? subcategory.value : this.subcategory,
+    tags: tags ?? this.tags,
   );
   UserRecipeEntity copyWithCompanion(UserRecipesCompanion data) {
     return UserRecipeEntity(
@@ -1052,6 +1183,14 @@ class UserRecipeEntity extends DataClass
       imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
       isPublic: data.isPublic.present ? data.isPublic.value : this.isPublic,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      authorName: data.authorName.present
+          ? data.authorName.value
+          : this.authorName,
+      category: data.category.present ? data.category.value : this.category,
+      subcategory: data.subcategory.present
+          ? data.subcategory.value
+          : this.subcategory,
+      tags: data.tags.present ? data.tags.value : this.tags,
     );
   }
 
@@ -1066,7 +1205,11 @@ class UserRecipeEntity extends DataClass
           ..write('coverEmoji: $coverEmoji, ')
           ..write('imageUrl: $imageUrl, ')
           ..write('isPublic: $isPublic, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('authorName: $authorName, ')
+          ..write('category: $category, ')
+          ..write('subcategory: $subcategory, ')
+          ..write('tags: $tags')
           ..write(')'))
         .toString();
   }
@@ -1082,6 +1225,10 @@ class UserRecipeEntity extends DataClass
     imageUrl,
     isPublic,
     createdAt,
+    authorName,
+    category,
+    subcategory,
+    tags,
   );
   @override
   bool operator ==(Object other) =>
@@ -1095,7 +1242,11 @@ class UserRecipeEntity extends DataClass
           other.coverEmoji == this.coverEmoji &&
           other.imageUrl == this.imageUrl &&
           other.isPublic == this.isPublic &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.authorName == this.authorName &&
+          other.category == this.category &&
+          other.subcategory == this.subcategory &&
+          other.tags == this.tags);
 }
 
 class UserRecipesCompanion extends UpdateCompanion<UserRecipeEntity> {
@@ -1108,6 +1259,10 @@ class UserRecipesCompanion extends UpdateCompanion<UserRecipeEntity> {
   final Value<String?> imageUrl;
   final Value<bool> isPublic;
   final Value<int> createdAt;
+  final Value<String> authorName;
+  final Value<String?> category;
+  final Value<String?> subcategory;
+  final Value<String> tags;
   final Value<int> rowid;
   const UserRecipesCompanion({
     this.id = const Value.absent(),
@@ -1119,6 +1274,10 @@ class UserRecipesCompanion extends UpdateCompanion<UserRecipeEntity> {
     this.imageUrl = const Value.absent(),
     this.isPublic = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.authorName = const Value.absent(),
+    this.category = const Value.absent(),
+    this.subcategory = const Value.absent(),
+    this.tags = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   UserRecipesCompanion.insert({
@@ -1131,6 +1290,10 @@ class UserRecipesCompanion extends UpdateCompanion<UserRecipeEntity> {
     this.imageUrl = const Value.absent(),
     this.isPublic = const Value.absent(),
     required int createdAt,
+    this.authorName = const Value.absent(),
+    this.category = const Value.absent(),
+    this.subcategory = const Value.absent(),
+    this.tags = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -1147,6 +1310,10 @@ class UserRecipesCompanion extends UpdateCompanion<UserRecipeEntity> {
     Expression<String>? imageUrl,
     Expression<bool>? isPublic,
     Expression<int>? createdAt,
+    Expression<String>? authorName,
+    Expression<String>? category,
+    Expression<String>? subcategory,
+    Expression<String>? tags,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1159,6 +1326,10 @@ class UserRecipesCompanion extends UpdateCompanion<UserRecipeEntity> {
       if (imageUrl != null) 'image_url': imageUrl,
       if (isPublic != null) 'is_public': isPublic,
       if (createdAt != null) 'created_at': createdAt,
+      if (authorName != null) 'author_name': authorName,
+      if (category != null) 'category': category,
+      if (subcategory != null) 'subcategory': subcategory,
+      if (tags != null) 'tags': tags,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1173,6 +1344,10 @@ class UserRecipesCompanion extends UpdateCompanion<UserRecipeEntity> {
     Value<String?>? imageUrl,
     Value<bool>? isPublic,
     Value<int>? createdAt,
+    Value<String>? authorName,
+    Value<String?>? category,
+    Value<String?>? subcategory,
+    Value<String>? tags,
     Value<int>? rowid,
   }) {
     return UserRecipesCompanion(
@@ -1185,6 +1360,10 @@ class UserRecipesCompanion extends UpdateCompanion<UserRecipeEntity> {
       imageUrl: imageUrl ?? this.imageUrl,
       isPublic: isPublic ?? this.isPublic,
       createdAt: createdAt ?? this.createdAt,
+      authorName: authorName ?? this.authorName,
+      category: category ?? this.category,
+      subcategory: subcategory ?? this.subcategory,
+      tags: tags ?? this.tags,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1219,6 +1398,18 @@ class UserRecipesCompanion extends UpdateCompanion<UserRecipeEntity> {
     if (createdAt.present) {
       map['created_at'] = Variable<int>(createdAt.value);
     }
+    if (authorName.present) {
+      map['author_name'] = Variable<String>(authorName.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (subcategory.present) {
+      map['subcategory'] = Variable<String>(subcategory.value);
+    }
+    if (tags.present) {
+      map['tags'] = Variable<String>(tags.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1237,6 +1428,10 @@ class UserRecipesCompanion extends UpdateCompanion<UserRecipeEntity> {
           ..write('imageUrl: $imageUrl, ')
           ..write('isPublic: $isPublic, ')
           ..write('createdAt: $createdAt, ')
+          ..write('authorName: $authorName, ')
+          ..write('category: $category, ')
+          ..write('subcategory: $subcategory, ')
+          ..write('tags: $tags, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1588,6 +1783,10 @@ typedef $$UserRecipesTableCreateCompanionBuilder =
       Value<String?> imageUrl,
       Value<bool> isPublic,
       required int createdAt,
+      Value<String> authorName,
+      Value<String?> category,
+      Value<String?> subcategory,
+      Value<String> tags,
       Value<int> rowid,
     });
 typedef $$UserRecipesTableUpdateCompanionBuilder =
@@ -1601,6 +1800,10 @@ typedef $$UserRecipesTableUpdateCompanionBuilder =
       Value<String?> imageUrl,
       Value<bool> isPublic,
       Value<int> createdAt,
+      Value<String> authorName,
+      Value<String?> category,
+      Value<String?> subcategory,
+      Value<String> tags,
       Value<int> rowid,
     });
 
@@ -1655,6 +1858,26 @@ class $$UserRecipesTableFilterComposer
 
   ColumnFilters<int> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get authorName => $composableBuilder(
+    column: $table.authorName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get subcategory => $composableBuilder(
+    column: $table.subcategory,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tags => $composableBuilder(
+    column: $table.tags,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -1712,6 +1935,26 @@ class $$UserRecipesTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get authorName => $composableBuilder(
+    column: $table.authorName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get subcategory => $composableBuilder(
+    column: $table.subcategory,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$UserRecipesTableAnnotationComposer
@@ -1755,6 +1998,22 @@ class $$UserRecipesTableAnnotationComposer
 
   GeneratedColumn<int> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<String> get authorName => $composableBuilder(
+    column: $table.authorName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<String> get subcategory => $composableBuilder(
+    column: $table.subcategory,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
 }
 
 class $$UserRecipesTableTableManager
@@ -1797,6 +2056,10 @@ class $$UserRecipesTableTableManager
                 Value<String?> imageUrl = const Value.absent(),
                 Value<bool> isPublic = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
+                Value<String> authorName = const Value.absent(),
+                Value<String?> category = const Value.absent(),
+                Value<String?> subcategory = const Value.absent(),
+                Value<String> tags = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => UserRecipesCompanion(
                 id: id,
@@ -1808,6 +2071,10 @@ class $$UserRecipesTableTableManager
                 imageUrl: imageUrl,
                 isPublic: isPublic,
                 createdAt: createdAt,
+                authorName: authorName,
+                category: category,
+                subcategory: subcategory,
+                tags: tags,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -1821,6 +2088,10 @@ class $$UserRecipesTableTableManager
                 Value<String?> imageUrl = const Value.absent(),
                 Value<bool> isPublic = const Value.absent(),
                 required int createdAt,
+                Value<String> authorName = const Value.absent(),
+                Value<String?> category = const Value.absent(),
+                Value<String?> subcategory = const Value.absent(),
+                Value<String> tags = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => UserRecipesCompanion.insert(
                 id: id,
@@ -1832,6 +2103,10 @@ class $$UserRecipesTableTableManager
                 imageUrl: imageUrl,
                 isPublic: isPublic,
                 createdAt: createdAt,
+                authorName: authorName,
+                category: category,
+                subcategory: subcategory,
+                tags: tags,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

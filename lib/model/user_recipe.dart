@@ -34,6 +34,10 @@ class UserRecipe {
   final String coverEmoji;
   final bool isPublic;
   final int createdAt;
+  final String authorName;
+  final String? category;
+  final String? subcategory;
+  final List<String> tags;
 
   UserRecipe({
     required this.id,
@@ -45,21 +49,35 @@ class UserRecipe {
     this.coverEmoji = '🍽',
     this.isPublic = false,
     int? createdAt,
+    this.authorName = '',
+    this.category,
+    this.subcategory,
+    this.tags = const [],
   }) : createdAt = createdAt ?? DateTime.now().millisecondsSinceEpoch;
 
   UserRecipe copyWith({
     String? id, String? name, String? description,
     List<String>? ingredients, List<UserRecipeStep>? steps,
     String? imageUrl, String? coverEmoji, bool? isPublic, int? createdAt,
+    String? authorName, String? category, String? subcategory, List<String>? tags,
   }) => UserRecipe(
-    id: id ?? this.id, name: name ?? this.name,
+    id: id ?? this.id,
+    name: name ?? this.name,
     description: description ?? this.description,
     ingredients: ingredients ?? this.ingredients,
-    steps: steps ?? this.steps, imageUrl: imageUrl ?? this.imageUrl,
+    steps: steps ?? this.steps,
+    imageUrl: imageUrl ?? this.imageUrl,
     coverEmoji: coverEmoji ?? this.coverEmoji,
-    isPublic: isPublic ?? this.isPublic, createdAt: createdAt ?? this.createdAt,
+    isPublic: isPublic ?? this.isPublic,
+    createdAt: createdAt ?? this.createdAt,
+    authorName: authorName ?? this.authorName,
+    category: category ?? this.category,
+    subcategory: subcategory ?? this.subcategory,
+    tags: tags ?? this.tags,
   );
 
   String stepsJson() => jsonEncode(steps.map((s) => s.toJson()).toList());
   String ingredientsJson() => jsonEncode(ingredients);
+  String tagsJson() => jsonEncode(tags);
 }
+

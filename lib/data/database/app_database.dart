@@ -32,6 +32,10 @@ class UserRecipes extends Table {
   TextColumn get imageUrl => text().nullable()();
   BoolColumn get isPublic => boolean().withDefault(const Constant(false))();
   IntColumn get createdAt => integer()();
+  TextColumn get authorName => text().withDefault(const Constant(''))();
+  TextColumn get category => text().nullable()();
+  TextColumn get subcategory => text().nullable()();
+  TextColumn get tags => text().withDefault(const Constant('[]'))(); // JSON
 
   @override
   Set<Column> get primaryKey => {id};
@@ -42,13 +46,21 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(driftDatabase(name: 'cozinhei_db'));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (migrator, from, to) async {
       if (from < 2) {
         await migrator.createTable(userRecipes);
+      }
+      if (from < 3) {
+        await migrator.addColumn(userRecipes, userRecipes.authorName);
+        await migrator.addColumn(userRecipes, userRecipes.category);
+        await migrator.addColumn(userRecipes, userRecipes.tags);
+      }
+      if (from < 4) {
+        await migrator.addColumn(userRecipes, userRecipes.subcategory);
       }
     },
   );

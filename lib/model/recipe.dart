@@ -10,6 +10,8 @@ class Recipe {
   final int createdAt;
   final String? imageUrl;
   final String? source;
+  final String authorName;
+  final List<String> categories;
 
   Recipe({
     required this.id,
@@ -23,6 +25,8 @@ class Recipe {
     int? createdAt,
     this.imageUrl,
     this.source,
+    this.authorName = '',
+    this.categories = const [],
   }) : createdAt = createdAt ?? DateTime.now().millisecondsSinceEpoch;
 
   Recipe copyWith({
@@ -37,6 +41,8 @@ class Recipe {
     int? createdAt,
     String? imageUrl,
     String? source,
+    String? authorName,
+    List<String>? categories,
   }) {
     return Recipe(
       id: id ?? this.id,
@@ -50,6 +56,8 @@ class Recipe {
       createdAt: createdAt ?? this.createdAt,
       imageUrl: imageUrl ?? this.imageUrl,
       source: source ?? this.source,
+      authorName: authorName ?? this.authorName,
+      categories: categories ?? this.categories,
     );
   }
 }

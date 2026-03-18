@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
+import '../../../data/repository/community_recipe_repository.dart';
+import '../../../di/injection.dart';
+import '../../../model/recipe_filter.dart';
 import '../../../model/user_recipe.dart';
 import '../../../providers.dart';
 import '../../theme/app_colors.dart';
@@ -10,6 +15,17 @@ const _emojis = [
   '🍽','🍕','🍔','🍣','🍜','🥗','🍲','🥘','🍱','🥩',
   '🍗','🥚','🧀','🥦','🍅','🌽','🍋','🍰','🎂','🍩',
   '🥐','🍞','🧇','🥞','🫕','🥙','🌮','🫔','🍛','🍤',
+];
+
+const _categories = [
+  'Café da Manhã', 'Massas', 'Carnes', 'Frango',
+  'Peixes', 'Saladas', 'Lanches', 'Sopas', 'Arroz',
+  'Pizzas', 'Sobremesas', 'Cozinhas do Mundo', 'Vegetariano',
+];
+
+const _tagOptions = [
+  '⚡ Rápido', '🔥 Air Fryer', '🥑 Saudável', '🌱 Vegano',
+  '💪 Proteico', '💰 Econômico', '🍽️ Fácil', '👨‍🍳 Gourmet',
 ];
 
 class RecipeEditorScreen extends ConsumerStatefulWidget {
@@ -31,6 +47,11 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
 
   final _ingredientCtrl = TextEditingController();
 
+  late final TextEditingController _authorCtrl;
+  String? _category;
+  String? _subcategory;
+  List<String> _tags = [];
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +60,10 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
     _descCtrl = TextEditingController(text: r?.description ?? '');
     _emoji = r?.coverEmoji ?? '🍽';
     _isPublic = r?.isPublic ?? false;
+    _authorCtrl = TextEditingController(text: r?.authorName ?? '');
+    _category = r?.category;
+    _subcategory = r?.subcategory;
+    _tags = List.from(r?.tags ?? []);
     _ingredients = List.from(r?.ingredients ?? []);
     _steps = List.from(r?.steps ?? [const UserRecipeStep(description: '')]);
   }
@@ -49,6 +74,7 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
     _descCtrl.dispose();
     _ingredientCtrl.dispose();
     super.dispose();
+    _authorCtrl.dispose();
   }
 
   Future<void> _save() async {
@@ -64,9 +90,52 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
       coverEmoji: _emoji,
       isPublic: _isPublic,
       createdAt: existing?.createdAt,
+      authorName: _authorCtrl.text.trim(),
+      category: _category,
+      subcategory: _subcategory,
+      tags: _tags,
     );
     await notifier.save(recipe);
+
+    if (_isPublic) {
+      final communityRepo = ref.read(communityRecipeRepositoryProvider);
+      await _publishToCommunity(recipe, communityRepo);
+    }
+
     if (mounted) context.pop();
+  }
+
+  Future<void> _publishToCommunity(
+    UserRecipe recipe,
+    CommunityRecipeRepository communityRepo,
+  ) async {
+    try {
+      final prefs = getIt<SharedPreferences>();
+      var deviceId = prefs.getString('device_id');
+      if (deviceId == null) {
+        deviceId = const Uuid().v4();
+        await prefs.setString('device_id', deviceId);
+      }
+      final result = await communityRepo.publish(recipe: recipe, deviceId: deviceId);
+      if (!result.ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Receita não aprovada: ${result.reason ?? "tente novamente"}'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('PUBLISH ERROR: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao publicar: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
   }
 
   void _addIngredient() {
@@ -182,6 +251,92 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
               ),
             ),
             const SizedBox(height: 20),
+
+            // Nível 1 — Categoria (obrigatório)
+            _sectionHeader('Categoria *'),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: _category,
+              decoration: _inputDecoration('Selecione uma categoria'),
+              items: _categories
+                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                  .toList(),
+              onChanged: (v) => setState(() {
+                _category = v;
+                _subcategory = null; // reseta subcategoria ao trocar categoria
+              }),
+              validator: (v) => v == null ? 'Selecione uma categoria' : null,
+            ),
+            const SizedBox(height: 12),
+
+            // Nível 2 — Subcategoria (opcional, aparece se categoria tem subcategorias)
+            Builder(builder: (_) {
+              final subs = allCategories
+                  .where((c) => c.name == _category)
+                  .firstOrNull
+                  ?.subcategories ?? [];
+              if (subs.isEmpty) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionHeader('Subcategoria (opcional)'),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: _subcategory,
+                    decoration: _inputDecoration('Selecione uma subcategoria'),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Nenhuma')),
+                      ...subs.map((s) => DropdownMenuItem(value: s, child: Text(s))),
+                    ],
+                    onChanged: (v) => setState(() => _subcategory = v),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              );
+            }),
+
+            // Nível 3 — Tags (opcional)
+            _sectionHeader('Tags (opcional)'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: _tagOptions.map((tag) {
+                final selected = _tags.contains(tag);
+                return FilterChip(
+                  label: Text(tag),
+                  selected: selected,
+                  onSelected: (v) => setState(() =>
+                  v ? _tags.add(tag) : _tags.remove(tag)),
+                  selectedColor: brandOrangeLight,
+                  checkmarkColor: brandOrange,
+                  labelStyle: TextStyle(
+                    color: selected ? brandOrange : textMedium,
+                    fontSize: 12,
+                  ),
+                  side: BorderSide(
+                    color: selected ? brandOrange : const Color(0xFFDDD8D3),
+                  ),
+                  backgroundColor: Colors.white,
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+
+            // Nome do autor — só quando pública
+            if (_isPublic) ...[
+              _sectionHeader('Informações públicas'),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _authorCtrl,
+                decoration: _inputDecoration('Seu nome (aparece na receita) *'),
+                textCapitalization: TextCapitalization.words,
+                validator: (v) => _isPublic && (v == null || v.trim().isEmpty)
+                    ? 'Obrigatório para receitas públicas'
+                    : null,
+              ),
+              const SizedBox(height: 20),
+            ],
 
             // Ingredientes
             _sectionHeader('Ingredientes'),
