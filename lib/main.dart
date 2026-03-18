@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'di/injection.dart';
 import 'ui/navigation/app_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +29,9 @@ class CozinheiApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         useMaterial3: true,
+        textTheme: GoogleFonts.dmSansTextTheme(
+          ThemeData.light().textTheme,
+        ),
       ),
       routerConfig: appRouter,
     );

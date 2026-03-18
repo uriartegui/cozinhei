@@ -24,7 +24,7 @@ class _SavedRecipesScreenState extends ConsumerState<SavedRecipesScreen> {
     final asyncData = _showFavoritesOnly ? favoritesAsync : savedAsync;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: brandOrangeLight,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

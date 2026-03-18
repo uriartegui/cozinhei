@@ -10,6 +10,8 @@ dependencies:
   flutter:
     sdk: flutter
 
+  google_fonts: ^6.2.1
+
   uuid: ^4.5.3
 
   # HTTP
@@ -34,6 +36,9 @@ dependencies:
 
   # Preferências
   shared_preferences: ^2.2.2
+
+  # Som de alarme
+  flutter_ringtone_player: ^4.0.0
 
   cupertino_icons: ^1.0.2
 

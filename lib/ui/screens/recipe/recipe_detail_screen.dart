@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../model/recipe.dart';
 import '../../../providers.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/step_timer_widget.dart';
 
 class RecipeDetailScreen extends ConsumerWidget {
   final Recipe recipe;
@@ -22,7 +23,7 @@ class RecipeDetailScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: brandOrangeLight,
       body: Stack(
         children: [
           SingleChildScrollView(
@@ -184,18 +185,29 @@ class RecipeDetailScreen extends ConsumerWidget {
                                   ),
                                 ),
                               ),
-                              Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Text(step,
-                                      style: const TextStyle(
-                                          fontSize: 14, height: 1.5)),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(step, style: const TextStyle(fontSize: 14, height: 1.5)),
+                                    Builder(builder: (_) {
+                                      final secs = parseStepSeconds(step);
+                                      if (secs == null) return const SizedBox.shrink();
+                                      return Padding(
+                                        padding: const EdgeInsets.only(top: 8),
+                                        child: StepTimerWidget(totalSeconds: secs),
+                                      );
+                                    }),
+                                  ],
                                 ),
                               ),
-                            ],
-                          ),
-                        );
-                      }),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
 
                       const SizedBox(height: 8),
 
@@ -205,7 +217,7 @@ class RecipeDetailScreen extends ConsumerWidget {
                         height: 52,
                         child: ElevatedButton(
                           onPressed: () =>
-                              context.go('/cooking', extra: currentRecipe),
+                              context.push('/cooking', extra: currentRecipe),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: brandOrange,
                             shape: RoundedRectangleBorder(

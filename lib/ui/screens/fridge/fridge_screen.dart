@@ -33,7 +33,7 @@ class _FridgeScreenState extends ConsumerState<FridgeScreen> {
     final ingredients = ref.watch(fridgeProvider);
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: brandOrangeLight,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

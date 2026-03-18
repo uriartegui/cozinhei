@@ -7,6 +7,7 @@ import '../data/database/app_database.dart';
 import '../data/repository/fridge_repository.dart';
 import '../data/repository/recipe_repository.dart';
 import '../core/constants.dart';
+import '../data/repository/user_recipe_repository.dart';
 
 final getIt = GetIt.instance;
 
@@ -35,5 +36,8 @@ Future<void> setupDependencies() async {
       getIt<UnsplashService>(),
       getIt<AppDatabase>(),
     ),
+  );
+  getIt.registerSingleton<UserRecipeRepository>(
+    UserRecipeRepository(getIt<AppDatabase>()),
   );
 }

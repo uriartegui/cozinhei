@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../theme/app_colors.dart';
 import '../../../model/recipe.dart';
+import '../../widgets/step_timer_widget.dart';
 
 class CookingModeScreen extends StatefulWidget {
   final Recipe recipe;
@@ -31,7 +33,7 @@ class _CookingModeScreenState extends State<CookingModeScreen> {
         backgroundColor: brandOrange,
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
       ),
       body: Padding(
@@ -39,7 +41,7 @@ class _CookingModeScreenState extends State<CookingModeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Progress
+            // Progresso
             Column(
               children: [
                 Text(
@@ -60,7 +62,7 @@ class _CookingModeScreenState extends State<CookingModeScreen> {
               ],
             ),
 
-            // Step content
+            // Conteúdo do passo
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
               transitionBuilder: (child, animation) => SlideTransition(
@@ -73,7 +75,6 @@ class _CookingModeScreenState extends State<CookingModeScreen> {
               child: Column(
                 key: ValueKey(_currentStep),
                 children: [
-                  // Step number circle
                   Container(
                     width: 80,
                     height: 80,
@@ -93,15 +94,14 @@ class _CookingModeScreenState extends State<CookingModeScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  // Step text card
                   Card(
                     elevation: 4,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16)),
                     child: Container(
                       width: double.infinity,
-                      constraints: const BoxConstraints(minHeight: 180),
-                      padding: const EdgeInsets.all(28),
+                      constraints: const BoxConstraints(minHeight: 120),
+                      padding: const EdgeInsets.all(24),
                       child: Center(
                         child: Text(
                           _cleanStep(steps[_currentStep]),
@@ -115,11 +115,17 @@ class _CookingModeScreenState extends State<CookingModeScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 20),
+                  Builder(builder: (_) {
+                    final secs = parseStepSeconds(steps[_currentStep]);
+                    if (secs == null) return const SizedBox.shrink();
+                    return StepTimerWidget(totalSeconds: secs, large: true);
+                  }),
                 ],
               ),
             ),
 
-            // Navigation buttons
+            // Botões de navegação
             Row(
               children: [
                 Expanded(
@@ -140,31 +146,29 @@ class _CookingModeScreenState extends State<CookingModeScreen> {
                 Expanded(
                   child: _currentStep < steps.length - 1
                       ? ElevatedButton.icon(
-                    onPressed: () =>
-                        setState(() => _currentStep++),
+                    onPressed: () => setState(() => _currentStep++),
                     icon: const Text('Próximo'),
                     label: const Icon(Icons.arrow_forward),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: brandOrange,
                       foregroundColor: Colors.white,
-                      padding:
-                      const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
                   )
                       : ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => context.pop(),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
-                      padding:
-                      const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
                     child: const Text('Finalizar! 🎉',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
+                        style:
+                        TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],

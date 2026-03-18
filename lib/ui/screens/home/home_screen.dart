@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../model/recipe.dart';
 import '../../../model/recipe_filter.dart';
 import '../../../providers.dart';
 import '../../../viewmodel/home_state.dart';
@@ -109,7 +108,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         allCategories.where((c) => c.name == selectedCategory).firstOrNull;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: brandOrangeLight,
       body: CustomScrollView(
         slivers: [
           SliverPadding(
@@ -135,11 +134,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Da sua geladeira 🧊',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        const Icon(Icons.kitchen, size: 18, color: brandOrange),
+                        const SizedBox(width: 6),
+                        Text('Da sua geladeira',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold)),
+                      ],
+                    ),
                     if (fridgeSuggestions is FridgeSuggestionsSuccess)
                       TextButton(
                         onPressed: notifier.loadFridgeSuggestions,
@@ -397,19 +402,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                 const SizedBox(height: 16),
 
-                // Loading
-                if (uiState is HomeLoading)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 40),
-                    child: Column(
-                      children: [
-                        CircularProgressIndicator(color: brandOrange),
-                        SizedBox(height: 12),
-                        Text('Buscando receitas e fotos...',
-                            style: TextStyle(color: textMedium)),
-                      ],
-                    ),
-                  ),
+                // Loading — skeleton grid
+                if (uiState is HomeLoading) ...[
+                  const SizedBox(height: 8),
+                  const Text('Buscando receitas...',
+                      style: TextStyle(color: textMedium, fontSize: 13)),
+                  const SizedBox(height: 12),
+                ],
 
                 // Error
                 if (uiState is HomeError)
@@ -469,7 +468,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 0.72,
+                  childAspectRatio: 0.70,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (_, i) {
@@ -485,6 +484,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     );
                   },
                   childCount: uiState.recipes.length,
+                ),
+              ),
+            ),
+          // Skeleton Grid
+          if (uiState is HomeLoading)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 0.70,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                      (_, __) => _SkeletonCard(),
+                  childCount: 4,
                 ),
               ),
             ),
@@ -565,13 +581,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis),
                           const SizedBox(height: 2),
-                          Text('⏱ ${recipe.cookingTime}',
-                              style: const TextStyle(
-                                  color: textMedium, fontSize: 10)),
+                          Row(
+                            children: [
+                              const Icon(Icons.schedule, size: 11, color: textMedium),
+                              const SizedBox(width: 3),
+                              Text(recipe.cookingTime,
+                                  style: const TextStyle(color: textMedium, fontSize: 10)),
+                            ],
+                          ),
                           if (recipe.source != null)
-                            Text('🌐 ${recipe.source}',
-                                style: const TextStyle(
-                                    color: textMedium, fontSize: 10)),
+                            Row(
+                              children: [
+                                const Icon(Icons.public, size: 11, color: textMedium),
+                                const SizedBox(width: 3),
+                                Expanded(
+                                  child: Text(recipe.source!,
+                                      style: const TextStyle(color: textMedium, fontSize: 10),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                ),
+                              ],
+                            ),
                         ],
                       ),
                     ),
@@ -596,7 +626,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('🧊', style: TextStyle(fontSize: 16)),
+              const Icon(Icons.kitchen, size: 20, color: brandOrange),
               SizedBox(width: 6),
               Text('Sua geladeira está vazia',
                   style: TextStyle(fontWeight: FontWeight.bold)),
@@ -615,6 +645,82 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     color: brandOrange, fontWeight: FontWeight.w600)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SkeletonCard extends StatefulWidget {
+  @override
+  State<_SkeletonCard> createState() => _SkeletonCardState();
+}
+
+class _SkeletonCardState extends State<_SkeletonCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _anim = Tween(begin: 0.4, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _anim,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 150,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8E4E0),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(height: 12, width: double.infinity,
+                      decoration: BoxDecoration(color: const Color(0xFFE8E4E0),
+                          borderRadius: BorderRadius.circular(6))),
+                  const SizedBox(height: 6),
+                  Container(height: 12, width: 100,
+                      decoration: BoxDecoration(color: const Color(0xFFEEEAE6),
+                          borderRadius: BorderRadius.circular(6))),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

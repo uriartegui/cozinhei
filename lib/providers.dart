@@ -7,6 +7,9 @@ import 'viewmodel/home_state.dart';
 import 'viewmodel/fridge_notifier.dart';
 import 'viewmodel/saved_recipes_notifier.dart';
 import 'di/injection.dart';
+import 'data/repository/user_recipe_repository.dart';
+import 'model/user_recipe.dart';
+import 'viewmodel/user_recipes_notifier.dart';
 
 // Repositories
 final recipeRepositoryProvider = Provider<RecipeRepository>(
@@ -42,3 +45,13 @@ final savedRecipesProvider = StreamProvider<List<Recipe>>((ref) {
 final favoriteRecipesProvider = StreamProvider<List<Recipe>>((ref) {
   return ref.read(recipeRepositoryProvider).getFavoriteRecipes();
 });
+
+// ── User Recipes (Caderno) ──────────────────────────────────────────────────
+final userRecipeRepositoryProvider = Provider<UserRecipeRepository>(
+      (ref) => getIt<UserRecipeRepository>(),
+);
+
+final userRecipesProvider =
+StateNotifierProvider<UserRecipesNotifier, AsyncValue<List<UserRecipe>>>(
+      (ref) => UserRecipesNotifier(ref.read(userRecipeRepositoryProvider)),
+);
