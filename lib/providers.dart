@@ -6,6 +6,7 @@ import 'model/recipe.dart';
 import 'viewmodel/home_notifier.dart';
 import 'viewmodel/home_state.dart';
 import 'viewmodel/fridge_notifier.dart';
+import 'viewmodel/fridge_state.dart';
 import 'viewmodel/saved_recipes_notifier.dart';
 import 'di/injection.dart';
 import 'data/repository/user_recipe_repository.dart';
@@ -30,7 +31,7 @@ final homeProvider = StateNotifierProvider<HomeNotifier, HomeState>((ref) {
   );
 });
 
-final fridgeProvider = StateNotifierProvider<FridgeNotifier, List<String>>((ref) {
+final fridgeProvider = StateNotifierProvider<FridgeNotifier, FridgeState>((ref) {
   return FridgeNotifier(ref.read(fridgeRepositoryProvider));
 });
 

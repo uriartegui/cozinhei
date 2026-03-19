@@ -105,7 +105,7 @@ class HomeNotifier extends StateNotifier<HomeState> {
   /// Chamado ao navegar para home: só recarrega se a geladeira mudou ou ainda não carregou.
   Future<void> syncFridgeSuggestions() async {
     if (state.fridgeSuggestions is FridgeSuggestionsLoading) return;
-    final ingredients = _fridgeRepository.load();
+    final ingredients = _fridgeRepository.loadFridge().map((e) => e.name).toList();
     final key = (List<String>.from(ingredients)..sort()).join(',');
     if (key == _loadedFridgeKey && state.fridgeSuggestions is FridgeSuggestionsSuccess) return;
     if (key != _loadedFridgeKey) _shownFridgeNames.clear();
@@ -113,7 +113,7 @@ class HomeNotifier extends StateNotifier<HomeState> {
   }
 
   Future<void> loadFridgeSuggestions() async {
-    final ingredients = _fridgeRepository.load();
+    final ingredients = _fridgeRepository.loadFridge().map((e) => e.name).toList();
     if (ingredients.isEmpty) {
       state = state.copyWith(fridgeSuggestions: FridgeSuggestionsEmpty());
       return;

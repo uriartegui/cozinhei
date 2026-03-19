@@ -105,8 +105,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<List<String>>(fridgeProvider, (previous, next) {
-      if (previous != null && previous.length != next.length) {
+    ref.listen(fridgeProvider, (previous, next) {
+      if (previous != null && previous.items.length != next.items.length) {
         ref.read(homeProvider.notifier).syncFridgeSuggestions();
       }
     });
@@ -582,7 +582,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       builder: (_) => Consumer(
         builder: (ctx, ref, __) {
           final fridgeSuggestions = ref.watch(homeProvider).fridgeSuggestions;
-          final fridgeCount = ref.watch(fridgeProvider).length;
+          final fridgeCount = ref.watch(fridgeProvider).items.length;
           return Container(
             decoration: const BoxDecoration(
               color: Colors.white,
