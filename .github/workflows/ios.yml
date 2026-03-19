@@ -15,6 +15,17 @@ jobs:
         with:
           flutter-version: '3.41.5'
 
+      - name: Gerar constants.dart
+        run: |
+          cat > lib/core/constants.dart << EOF
+          class AppConstants {
+            static const String groqApiKey = '${{ secrets.GROQ_API_KEY }}';
+            static const String unsplashApiKey = '${{ secrets.UNSPLASH_API_KEY }}';
+            static const String supabaseUrl = '${{ secrets.SUPABASE_URL }}';
+            static const String supabaseAnonKey = '${{ secrets.SUPABASE_ANON_KEY }}';
+          }
+          EOF
+
       - run: flutter pub get
 
       - run: flutter build ios --debug --simulator

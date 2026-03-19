@@ -15,6 +15,8 @@ workflows:
           class AppConstants {
             static const String groqApiKey = '$GROQ_API_KEY';
             static const String unsplashApiKey = '$UNSPLASH_API_KEY';
+            static const String supabaseUrl = '$SUPABASE_URL';
+            static const String supabaseAnonKey = '$SUPABASE_ANON_KEY';
           }
           EOF
       - name: Instalar dependências
@@ -45,6 +47,8 @@ workflows:
           class AppConstants {
             static const String groqApiKey = '$GROQ_API_KEY';
             static const String unsplashApiKey = '$UNSPLASH_API_KEY';
+            static const String supabaseUrl = '$SUPABASE_URL';
+            static const String supabaseAnonKey = '$SUPABASE_ANON_KEY';
           }
           EOF
       - name: Instalar dependências
