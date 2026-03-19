@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/fridge/fridge_screen.dart';
 import '../screens/saved/saved_recipes_screen.dart';
@@ -47,7 +49,7 @@ final appRouter = GoRouter(
   ],
 );
 
-class _MainScaffold extends StatelessWidget {
+class _MainScaffold extends ConsumerWidget {
   final Widget child;
   const _MainScaffold({required this.child});
 
@@ -60,7 +62,7 @@ class _MainScaffold extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final index = _currentIndex(context);
     return Scaffold(
       backgroundColor: Colors.white,
@@ -78,7 +80,10 @@ class _MainScaffold extends StatelessWidget {
         child: BottomNavigationBar(
           currentIndex: index,
           onTap: (i) {
-            if (i == 0) context.go('/');
+            if (i == 0) {
+              context.go('/');
+              ref.read(homeProvider.notifier).syncFridgeSuggestions();
+            }
             if (i == 1) context.go('/my-recipes');
             if (i == 2) context.go('/fridge');
             if (i == 3) context.go('/saved');

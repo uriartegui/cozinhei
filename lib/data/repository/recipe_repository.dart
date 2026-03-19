@@ -109,12 +109,15 @@ Regras:
     final excludeClause = excludeNames.isNotEmpty
         ? '\n- NÃO sugira nenhuma dessas receitas que já foram mostradas: ${excludeNames.join(', ')}'
         : '';
+    final ingredientRule = ingredients.length == 1
+        ? '- Use o ingrediente disponível como base principal da receita'
+        : '- Cada receita usa apenas 2 a 4 dos ingredientes disponíveis';
     final prompt = '''
 Tenho estes ingredientes disponíveis: $ingredientList
-Crie 3 receitas usando APENAS ingredientes que fazem sentido juntos.
+Crie 3 receitas usando os ingredientes disponíveis.
 Regras obrigatórias:
 - NUNCA misture proteínas diferentes na mesma receita
-- Cada receita usa apenas 2 a 4 dos ingredientes disponíveis
+$ingredientRule
 - Pode complementar com temperos básicos (sal, alho, azeite, cebola, manteiga)
 - As 3 receitas devem ser diferentes entre si$excludeClause
 Responda APENAS com um JSON array válido:

@@ -28,12 +28,12 @@ const List<RecipeCategory> allCategories = [
 ];
 
 const List<String> allTags = [
-  "⚡ Rápido",
-  "🔥 Air Fryer",
-  "🥑 Saudável",
-  "🌱 Vegano",
-  "💪 Proteico",
-  "💰 Econômico",
-  "🍽️ Fácil",
-  "👨‍🍳 Gourmet",
+  "Rápido",
+  "Air Fryer",
+  "Saudável",
+  "Vegano",
+  "Proteico",
+  "Econômico",
+  "Fácil",
+  "Gourmet",
 ];

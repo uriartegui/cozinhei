@@ -11,6 +11,7 @@ class HomeNotifier extends StateNotifier<HomeState> {
   final CommunityRecipeRepository _communityRepository;
   final List<String> _shownRecipeNames = [];
   final List<String> _shownFridgeNames = [];
+  String _loadedFridgeKey = '';
 
   HomeNotifier(this._repository, this._fridgeRepository, this._communityRepository)
       : super(HomeState());
@@ -101,9 +102,19 @@ class HomeNotifier extends StateNotifier<HomeState> {
     }
   }
 
+  /// Chamado ao navegar para home: só recarrega se a geladeira mudou ou ainda não carregou.
+  Future<void> syncFridgeSuggestions() async {
+    if (state.fridgeSuggestions is FridgeSuggestionsLoading) return;
+    final ingredients = _fridgeRepository.load();
+    final key = (List<String>.from(ingredients)..sort()).join(',');
+    if (key == _loadedFridgeKey && state.fridgeSuggestions is FridgeSuggestionsSuccess) return;
+    if (key != _loadedFridgeKey) _shownFridgeNames.clear();
+    await loadFridgeSuggestions();
+  }
+
   Future<void> loadFridgeSuggestions() async {
     final ingredients = _fridgeRepository.load();
-    if (ingredients.length < 2) {
+    if (ingredients.isEmpty) {
       state = state.copyWith(fridgeSuggestions: FridgeSuggestionsEmpty());
       return;
     }
@@ -133,10 +144,13 @@ class HomeNotifier extends StateNotifier<HomeState> {
 
       final combined = [...communityResults, ...aiRecipes];
       _shownFridgeNames.addAll(combined.map((r) => r.name));
+      _loadedFridgeKey = (List<String>.from(ingredients)..sort()).join(',');
       state = state.copyWith(
         fridgeSuggestions: FridgeSuggestionsSuccess(combined),
       );
-    } catch (_) {
+    } catch (e) {
+      // ignore: avoid_print
+      print('[HomeNotifier] loadFridgeSuggestions error: $e');
       state = state.copyWith(fridgeSuggestions: FridgeSuggestionsEmpty());
     }
   }

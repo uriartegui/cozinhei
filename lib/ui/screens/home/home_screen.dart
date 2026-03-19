@@ -25,7 +25,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(homeProvider.notifier).loadFridgeSuggestions();
+      ref.read(homeProvider.notifier).syncFridgeSuggestions();
     });
   }
 
@@ -104,6 +104,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<List<String>>(fridgeProvider, (previous, next) {
+      if (previous != null && previous.length != next.length) {
+        ref.read(homeProvider.notifier).syncFridgeSuggestions();
+      }
+    });
+
     final state = ref.watch(homeProvider);
     final notifier = ref.read(homeProvider.notifier);
     final chips = state.chips;
@@ -127,51 +133,72 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                // Header
-                Text('Olá, Chef! 🍳',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold, color: brandOrange)),
-                Text('O que vamos cozinhar hoje?',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(color: textMedium)),
-                const SizedBox(height: 16),
+                        // Header
+                Row(
+                  children: [
+                    const Icon(Icons.restaurant_menu,
+                        color: brandOrange, size: 22),
+                    const SizedBox(width: 8),
+                    Text('Olá, Chef!',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF1B1B1D),
+                                letterSpacing: -0.3)),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Hero headline
+                const Text(
+                  'O que vamos\ncozinhar hoje?',
+                  style: TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.w700,
+                    height: 1.08,
+                    letterSpacing: -1.2,
+                    color: Color(0xFF1B1B1D),
+                  ),
+                ),
+                const SizedBox(height: 28),
 
                 // Fridge section header
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.kitchen, size: 18, color: brandOrange),
-                        const SizedBox(width: 6),
-                        Text('Da sua geladeira',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.bold)),
-                      ],
-                    ),
+                    const Text('DA SUA GELADEIRA',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                          color: Color(0xFF59413B),
+                        )),
                     if (fridgeSuggestions is FridgeSuggestionsSuccess)
-                      TextButton(
-                        onPressed: notifier.loadFridgeSuggestions,
+                      GestureDetector(
+                        onTap: notifier.loadFridgeSuggestions,
                         child: const Text('Gerar novas',
-                            style: TextStyle(color: brandOrange, fontSize: 12)),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: brandOrange,
+                            )),
                       ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
 
                 // Fridge content
-                _buildFridgeSection(fridgeSuggestions, notifier),
-                const SizedBox(height: 12),
-                const Divider(color: Color(0xFFE0E0E0)),
-                const SizedBox(height: 8),
+                _buildFridgeSection(fridgeSuggestions, notifier,
+                    ref.watch(fridgeProvider).length),
+                const SizedBox(height: 20),
+                const Divider(color: Color(0xFFE1BFB7), thickness: 0.8),
+                const SizedBox(height: 20),
 
                 // Categories
                 SizedBox(
-                  height: 36,
+                  height: 34,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     itemCount: allCategories.length,
@@ -189,18 +216,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
+                              horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
-                            color: isSelected ? brandOrange : surfaceGray,
+                            color: isSelected
+                                ? brandOrange
+                                : const Color(0xFFEAE7EA),
                             borderRadius: BorderRadius.circular(50),
                           ),
                           child: Text(
-                            '${cat.emoji} ${cat.name}',
+                            cat.name,
                             style: TextStyle(
                               fontSize: 12,
+                              fontWeight: FontWeight.w500,
                               color: isSelected
                                   ? Colors.white
-                                  : Theme.of(context).colorScheme.onSurface,
+                                  : const Color(0xFF1B1B1D),
                             ),
                           ),
                         ),
@@ -257,35 +287,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ],
 
-                // Tags
-                if (selectedSubcategory != null) ...[
+                // Tags (visível ao selecionar categoria)
+                if (selectedCategory != null) ...[
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: allTags.map((tag) {
-                      final isSelected = selectedTags.contains(tag);
-                      return GestureDetector(
-                        onTap: () => notifier.toggleTag(tag),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isSelected ? brandOrange : surfaceGray,
-                            borderRadius: BorderRadius.circular(50),
-                          ),
-                          child: Text(
-                            tag,
-                            style: TextStyle(
-                              fontSize: 11,
+                  SizedBox(
+                    height: 36,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: allTags.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (_, i) {
+                        final tag = allTags[i];
+                        final isSelected = selectedTags.contains(tag);
+                        return GestureDetector(
+                          onTap: () => notifier.toggleTag(tag),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
                               color: isSelected
-                                  ? Colors.white
-                                  : Theme.of(context).colorScheme.onSurface,
+                                  ? brandOrange.withOpacity(0.12)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(50),
+                              border: Border.all(
+                                color: isSelected
+                                    ? brandOrange
+                                    : const Color(0xFFDDDDDD),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Text(
+                              tag,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isSelected
+                                    ? brandOrange
+                                    : const Color(0xFF1B1B1D),
+                              ),
                             ),
                           ),
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      },
+                    ),
                   ),
                 ],
 
@@ -298,26 +342,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: TextField(
                         controller: _inputController,
                         decoration: InputDecoration(
-                          hintText: 'Ex: leite, ovo, macarrão...',
-                          hintStyle: const TextStyle(color: textMedium),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide:
-                                const BorderSide(color: Color(0xFFE0E0E0)),
-                          ),
+                          prefixIcon: const Icon(Icons.flatware,
+                              color: Color(0xFF59413B), size: 20),
+                          hintText: 'Ex: Frango, batata...',
+                          hintStyle: const TextStyle(
+                              color: Color(0xFF59413B), fontSize: 14),
+                          filled: true,
+                          fillColor: const Color(0xFFEAE7EA),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
-                            borderSide:
-                                const BorderSide(color: Color(0xFFE0E0E0)),
+                            borderSide: BorderSide.none,
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(color: brandOrange),
+                            borderSide: const BorderSide(
+                                color: brandOrange, width: 1.5),
                           ),
-                          filled: true,
-                          fillColor: surfaceGray,
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
                         ),
                         onSubmitted: (_) => _addChip(),
                       ),
@@ -328,11 +374,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: Container(
                         width: 52,
                         height: 52,
-                        decoration: const BoxDecoration(
-                          gradient: brandGradient,
-                          shape: BoxShape.circle,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEAE7EA),
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Icon(Icons.add, color: Colors.white),
+                        child: const Icon(Icons.add,
+                            color: Color(0xFF1B1B1D)),
                       ),
                     ),
                   ],
@@ -380,17 +427,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           chips, selectedCategory, selectedSubcategory, selectedTags)
                       : null,
                   child: Container(
-                    height: 52,
+                    height: 56,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                         colors: uiState is! HomeLoading
-                            ? [brandOrange, brandOrangePink]
+                            ? [const Color(0xFFAE310E), brandOrange]
                             : [
+                                const Color(0xFFAE310E).withOpacity(0.4),
                                 brandOrange.withOpacity(0.4),
-                                brandOrangePink.withOpacity(0.4)
                               ],
                       ),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(50),
+                      boxShadow: uiState is! HomeLoading
+                          ? [
+                              BoxShadow(
+                                color: brandOrange.withOpacity(0.25),
+                                blurRadius: 20,
+                                offset: const Offset(0, 6),
+                              )
+                            ]
+                          : [],
                     ),
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -401,8 +459,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         Text('Gerar Receitas',
                             style: TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16)),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 17,
+                                letterSpacing: 0.2)),
                       ],
                     ),
                   ),
@@ -446,17 +505,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ],
                   ),
-                  OutlinedButton.icon(
-                    onPressed: () => _showServingsDialog(
+                  GestureDetector(
+                    onTap: () => _showServingsDialog(
                         chips, selectedCategory, selectedSubcategory, selectedTags),
-                    icon: const Icon(Icons.auto_awesome,
-                        color: brandOrange, size: 16),
-                    label: const Text('Gerar outras',
-                        style: TextStyle(color: brandOrange)),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: brandOrange),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                            color: brandOrange.withOpacity(0.5), width: 1.5),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.auto_awesome,
+                              color: brandOrange, size: 16),
+                          SizedBox(width: 8),
+                          Text('Gerar outras',
+                              style: TextStyle(
+                                  color: brandOrange,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14)),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -520,7 +591,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildFridgeSection(
-      FridgeSuggestionsState fridgeSuggestions, HomeNotifier notifier) {
+      FridgeSuggestionsState fridgeSuggestions, HomeNotifier notifier,
+      int fridgeCount) {
     if (fridgeSuggestions is FridgeSuggestionsLoading) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 16),
@@ -634,9 +706,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.kitchen, size: 20, color: brandOrange),
+              Icon(Icons.kitchen, size: 20, color: brandOrange),
               SizedBox(width: 6),
-              Text('Sua geladeira está vazia',
+              const Text('Sua geladeira está vazia',
                   style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),

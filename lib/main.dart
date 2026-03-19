@@ -36,7 +36,7 @@ class CozinheiApp extends StatelessWidget {
           brightness: Brightness.light,
         ),
         useMaterial3: true,
-        textTheme: GoogleFonts.dmSansTextTheme(
+        textTheme: GoogleFonts.interTextTheme(
           ThemeData.light().textTheme,
         ),
       ),
