@@ -133,7 +133,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                        // Header
+                // Header
                 Row(
                   children: [
                     const Icon(Icons.restaurant_menu,
@@ -155,45 +155,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 const Text(
                   'O que vamos\ncozinhar hoje?',
                   style: TextStyle(
-                    fontSize: 36,
+                    fontSize: 28,
                     fontWeight: FontWeight.w700,
-                    height: 1.08,
-                    letterSpacing: -1.2,
+                    height: 1.1,
+                    letterSpacing: -0.8,
                     color: Color(0xFF1B1B1D),
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 8),
 
-                // Fridge section header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('DA SUA GELADEIRA',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
-                          color: Color(0xFF59413B),
-                        )),
-                    if (fridgeSuggestions is FridgeSuggestionsSuccess)
-                      GestureDetector(
-                        onTap: notifier.loadFridgeSuggestions,
-                        child: const Text('Gerar novas',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: brandOrange,
-                            )),
-                      ),
-                  ],
+                // Fridge CTA — link de texto minimalista
+                GestureDetector(
+                  onTap: () => _showFridgeSheet(context, notifier),
+                  child: const Text(
+                    'Ver receitas da sua geladeira →',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: brandOrange,
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 12),
-
-                // Fridge content
-                _buildFridgeSection(fridgeSuggestions, notifier,
-                    ref.watch(fridgeProvider).length),
-                const SizedBox(height: 20),
-                const Divider(color: Color(0xFFE1BFB7), thickness: 0.8),
                 const SizedBox(height: 20),
 
                 // Categories
@@ -586,6 +568,68 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
           const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
         ],
+      ),
+    );
+  }
+
+  void _showFridgeSheet(BuildContext context, HomeNotifier notifier) {
+    notifier.syncFridgeSuggestions();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Consumer(
+        builder: (ctx, ref, __) {
+          final fridgeSuggestions = ref.watch(homeProvider).fridgeSuggestions;
+          final fridgeCount = ref.watch(fridgeProvider).length;
+          return Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 36, height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0E0E0),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Da sua geladeira',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1B1B1D),
+                        )),
+                    if (fridgeSuggestions is FridgeSuggestionsSuccess)
+                      GestureDetector(
+                        onTap: notifier.loadFridgeSuggestions,
+                        child: const Text('Gerar novas',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: brandOrange,
+                            )),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildFridgeSection(fridgeSuggestions, notifier, fridgeCount),
+                const SizedBox(height: 8),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
