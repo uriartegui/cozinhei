@@ -8,6 +8,10 @@ workflows:
       cocoapods: default
       vars:
         BUNDLE_ID: "com.guilherme.cozinhei"
+      ios_signing:
+        distribution_type: development
+        bundle_identifier: com.guilherme.cozinhei
+
     scripts:
       - name: Gerar constants.dart
         script: |
@@ -19,17 +23,20 @@ workflows:
             static const String supabaseAnonKey = '$SUPABASE_ANON_KEY';
           }
           EOF
+
       - name: Instalar dependências
         script: flutter pub get
+
       - name: Gerar código Drift
         script: dart run build_runner build --delete-conflicting-outputs
+
       - name: Build iOS
         script: |
-          flutter build ipa \
-            --release \
-            --export-options-plist=/Users/builder/export_options.plist
+          flutter build ipa --release
+
     artifacts:
       - build/ios/ipa/*.ipa
+
     publishing:
       email:
         recipients:
@@ -40,6 +47,7 @@ workflows:
     max_build_duration: 60
     environment:
       flutter: stable
+
     scripts:
       - name: Gerar constants.dart
         script: |
@@ -51,14 +59,19 @@ workflows:
             static const String supabaseAnonKey = '$SUPABASE_ANON_KEY';
           }
           EOF
+
       - name: Instalar dependências
         script: flutter pub get
+
       - name: Gerar código Drift
         script: dart run build_runner build --delete-conflicting-outputs
+
       - name: Build APK
         script: flutter build apk --release
+
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
+
     publishing:
       email:
         recipients:
