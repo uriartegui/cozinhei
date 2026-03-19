@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../../data/repository/community_recipe_repository.dart';
@@ -24,8 +27,8 @@ const _categories = [
 ];
 
 const _tagOptions = [
-  '⚡ Rápido', '🔥 Air Fryer', '🥑 Saudável', '🌱 Vegano',
-  '💪 Proteico', '💰 Econômico', '🍽️ Fácil', '👨‍🍳 Gourmet',
+  'Rápido', 'Air Fryer', 'Saudável', 'Vegano',
+  'Proteico', 'Econômico', 'Fácil', 'Gourmet',
 ];
 
 class RecipeEditorScreen extends ConsumerStatefulWidget {
@@ -44,13 +47,12 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
   late bool _isPublic;
   late List<String> _ingredients;
   late List<UserRecipeStep> _steps;
-
   final _ingredientCtrl = TextEditingController();
-
   late final TextEditingController _authorCtrl;
   String? _category;
   String? _subcategory;
   List<String> _tags = [];
+  String? _localImagePath; // caminho da foto escolhida da galeria ou câmera
 
   @override
   void initState() {
@@ -60,6 +62,10 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
     _descCtrl = TextEditingController(text: r?.description ?? '');
     _emoji = r?.coverEmoji ?? '🍽';
     _isPublic = r?.isPublic ?? false;
+    // Carrega foto local existente se houver
+    if (r?.imageUrl != null && (r!.imageUrl!.startsWith('/') || r.imageUrl!.startsWith('file://'))) {
+      _localImagePath = r.imageUrl!.replaceFirst('file://', '');
+    }
     _authorCtrl = TextEditingController(text: r?.authorName ?? '');
     _category = r?.category;
     _subcategory = r?.subcategory;
@@ -73,8 +79,8 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
     _nameCtrl.dispose();
     _descCtrl.dispose();
     _ingredientCtrl.dispose();
-    super.dispose();
     _authorCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _save() async {
@@ -88,6 +94,7 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
       ingredients: _ingredients,
       steps: _steps.where((s) => s.description.trim().isNotEmpty).toList(),
       coverEmoji: _emoji,
+      imageUrl: _localImagePath, // foto local, null se não escolheu
       isPublic: _isPublic,
       createdAt: existing?.createdAt,
       authorName: _authorCtrl.text.trim(),
@@ -96,12 +103,10 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
       tags: _tags,
     );
     await notifier.save(recipe);
-
     if (_isPublic) {
       final communityRepo = ref.read(communityRecipeRepositoryProvider);
       await _publishToCommunity(recipe, communityRepo);
     }
-
     if (mounted) context.pop();
   }
 
@@ -118,22 +123,18 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
       }
       final result = await communityRepo.publish(recipe: recipe, deviceId: deviceId);
       if (!result.ok && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Receita não aprovada: ${result.reason ?? "tente novamente"}'),
-            backgroundColor: Colors.red.shade700,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Receita não aprovada: ${result.reason ?? "tente novamente"}'),
+          backgroundColor: Colors.red.shade700,
+        ));
       }
     } catch (e) {
       debugPrint('PUBLISH ERROR: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao publicar: $e'),
-            backgroundColor: Colors.red.shade700,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Erro ao publicar: $e'),
+          backgroundColor: Colors.red.shade700,
+        ));
       }
     }
   }
@@ -148,205 +149,282 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final subcats = allCategories
+            .where((c) => c.name == _category)
+            .firstOrNull
+            ?.subcategories ??
+        [];
+
     return Scaffold(
       backgroundColor: brandOrangeLight,
       appBar: AppBar(
         backgroundColor: brandOrangeLight,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: brandOrange),
+          icon: const Icon(Icons.arrow_back_ios,
+              color: neutralDark, size: 20),
           onPressed: () => context.pop(),
         ),
         title: Text(
           widget.existing == null ? 'Nova Receita' : 'Editar Receita',
           style: const TextStyle(
-              color: brandOrange, fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        actions: [
-          TextButton(
-            onPressed: _save,
-            child: const Text('Salvar',
-                style: TextStyle(
-                    color: brandOrange,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16)),
+            color: neutralDark,
+            fontWeight: FontWeight.w600,
+            fontSize: 17,
           ),
-        ],
+        ),
+        centerTitle: true,
+        actions: const [],
       ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
           children: [
-            // Emoji + Nome
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: _pickEmoji,
-                  child: Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
+            // ── Título dinâmico ────────────────────────────────────────────
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _nameCtrl,
+              builder: (_, val, __) {
+                final name = val.text.trim().isEmpty
+                    ? (widget.existing == null ? 'Nova Receita' : 'Receita')
+                    : val.text;
+                return Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    color: neutralDark,
+                    height: 1.1,
+                    letterSpacing: -0.5,
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Ajuste os detalhes para tornar sua receita perfeita.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF888888),
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // ── NOME DA RECEITA ────────────────────────────────────────────
+            _sectionLabel('NOME DA RECEITA'),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _nameCtrl,
+              decoration: _inputDec('Ex: Peito de Frango Grelhado'),
+              validator: (v) =>
+                  v == null || v.trim().isEmpty ? 'Obrigatório' : null,
+              textCapitalization: TextCapitalization.sentences,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 14),
+
+            // ── TOGGLE PÚBLICO ─────────────────────────────────────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isPublic ? 'Pública' : 'Privada',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            color: neutralDark,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _isPublic
+                              ? 'Visível para outros usuários na busca'
+                              : 'Só você pode ver',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF888888),
+                          ),
                         ),
                       ],
                     ),
-                    child: Center(
-                      child: Text(_emoji,
-                          style: const TextStyle(fontSize: 32)),
-                    ),
+                  ),
+                  Switch(
+                    value: _isPublic,
+                    onChanged: (v) => setState(() => _isPublic = v),
+                    activeColor: Colors.white,
+                    activeTrackColor: brandOrange,
+                    inactiveThumbColor: Colors.white,
+                    inactiveTrackColor: const Color(0xFFDDDDDD),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // ── AUTOR (só se pública) ──────────────────────────────────────
+            if (_isPublic) ...[
+              _sectionLabel('AUTOR'),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _authorCtrl,
+                decoration: _inputDec('Seu nome ou perfil'),
+                textCapitalization: TextCapitalization.words,
+                validator: (v) =>
+                    _isPublic && (v == null || v.trim().isEmpty)
+                        ? 'Obrigatório para receitas públicas'
+                        : null,
+              ),
+              const SizedBox(height: 14),
+            ],
+
+            // ── CATEGORIA / SUBCATEGORIA (lado a lado) ─────────────────────
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _sectionLabel('CATEGORIA'),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        value: _category,
+                        isExpanded: true,
+                        decoration: _inputDec('').copyWith(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 14),
+                        ),
+                        icon: const Icon(Icons.keyboard_arrow_down,
+                            size: 20, color: Color(0xFF888888)),
+                        style: const TextStyle(
+                            fontSize: 13, color: neutralDark),
+                        items: _categories
+                            .map((c) =>
+                                DropdownMenuItem(value: c, child: Text(c)))
+                            .toList(),
+                        onChanged: (v) => setState(() {
+                          _category = v;
+                          _subcategory = null;
+                        }),
+                        validator: (v) => v == null ? 'Selecione' : null,
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: TextFormField(
-                    controller: _nameCtrl,
-                    decoration: _inputDecoration('Nome da receita *'),
-                    validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Obrigatório' : null,
-                    textCapitalization: TextCapitalization.sentences,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _sectionLabel('SUBCATEGORIA'),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        value: _subcategory,
+                        isExpanded: true,
+                        decoration: _inputDec('').copyWith(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 14),
+                        ),
+                        icon: const Icon(Icons.keyboard_arrow_down,
+                            size: 20, color: Color(0xFF888888)),
+                        style: const TextStyle(
+                            fontSize: 13, color: neutralDark),
+                        items: subcats.isEmpty
+                            ? [
+                                const DropdownMenuItem(
+                                    value: null, child: Text('—'))
+                              ]
+                            : [
+                                const DropdownMenuItem(
+                                    value: null, child: Text('Nenhuma')),
+                                ...subcats.map((s) =>
+                                    DropdownMenuItem(value: s, child: Text(s))),
+                              ],
+                        onChanged: subcats.isEmpty
+                            ? null
+                            : (v) => setState(() => _subcategory = v),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
-            // Descrição
-            TextFormField(
-              controller: _descCtrl,
-              decoration: _inputDecoration('Descrição (opcional)'),
-              maxLines: 2,
-              textCapitalization: TextCapitalization.sentences,
-            ),
-            const SizedBox(height: 20),
-
-            // Público / Privado
-            _sectionHeader('Visibilidade'),
-            const SizedBox(height: 8),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: SwitchListTile(
-                value: _isPublic,
-                onChanged: (v) => setState(() => _isPublic = v),
-                activeColor: brandOrange,
-                title: Text(
-                  _isPublic ? '🌐 Pública' : '🔒 Privada',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                subtitle: Text(
-                  _isPublic
-                      ? 'Aparece para outros usuários'
-                      : 'Só você pode ver',
-                  style: const TextStyle(color: textMedium, fontSize: 12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Nível 1 — Categoria (obrigatório)
-            _sectionHeader('Categoria *'),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _category,
-              decoration: _inputDecoration('Selecione uma categoria'),
-              items: _categories
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                  .toList(),
-              onChanged: (v) => setState(() {
-                _category = v;
-                _subcategory = null; // reseta subcategoria ao trocar categoria
-              }),
-              validator: (v) => v == null ? 'Selecione uma categoria' : null,
-            ),
-            const SizedBox(height: 12),
-
-            // Nível 2 — Subcategoria (opcional, aparece se categoria tem subcategorias)
-            Builder(builder: (_) {
-              final subs = allCategories
-                  .where((c) => c.name == _category)
-                  .firstOrNull
-                  ?.subcategories ?? [];
-              if (subs.isEmpty) return const SizedBox.shrink();
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _sectionHeader('Subcategoria (opcional)'),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: _subcategory,
-                    decoration: _inputDecoration('Selecione uma subcategoria'),
-                    items: [
-                      const DropdownMenuItem(value: null, child: Text('Nenhuma')),
-                      ...subs.map((s) => DropdownMenuItem(value: s, child: Text(s))),
-                    ],
-                    onChanged: (v) => setState(() => _subcategory = v),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-              );
-            }),
-
-            // Nível 3 — Tags (opcional)
-            _sectionHeader('Tags (opcional)'),
-            const SizedBox(height: 8),
+            // ── TAGS SUGERIDAS ─────────────────────────────────────────────
+            _sectionLabel('TAGS SUGERIDAS'),
+            const SizedBox(height: 10),
             Wrap(
               spacing: 8,
-              runSpacing: 6,
+              runSpacing: 8,
               children: _tagOptions.map((tag) {
                 final selected = _tags.contains(tag);
-                return FilterChip(
-                  label: Text(tag),
-                  selected: selected,
-                  onSelected: (v) => setState(() =>
-                  v ? _tags.add(tag) : _tags.remove(tag)),
-                  selectedColor: brandOrangeLight,
-                  checkmarkColor: brandOrange,
-                  labelStyle: TextStyle(
-                    color: selected ? brandOrange : textMedium,
-                    fontSize: 12,
+                return GestureDetector(
+                  onTap: () => setState(() =>
+                      selected ? _tags.remove(tag) : _tags.add(tag)),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: selected ? brandOrange : Colors.white,
+                      borderRadius: BorderRadius.circular(50),
+                      border: Border.all(
+                        color: selected
+                            ? brandOrange
+                            : const Color(0xFFDDDDDD),
+                      ),
+                    ),
+                    child: Text(
+                      tag,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: selected
+                            ? Colors.white
+                            : const Color(0xFF555555),
+                      ),
+                    ),
                   ),
-                  side: BorderSide(
-                    color: selected ? brandOrange : const Color(0xFFDDD8D3),
-                  ),
-                  backgroundColor: Colors.white,
                 );
               }).toList(),
             ),
             const SizedBox(height: 20),
 
-            // Nome do autor — só quando pública
-            if (_isPublic) ...[
-              _sectionHeader('Informações públicas'),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _authorCtrl,
-                decoration: _inputDecoration('Seu nome (aparece na receita) *'),
-                textCapitalization: TextCapitalization.words,
-                validator: (v) => _isPublic && (v == null || v.trim().isEmpty)
-                    ? 'Obrigatório para receitas públicas'
-                    : null,
-              ),
-              const SizedBox(height: 20),
-            ],
-
-            // Ingredientes
-            _sectionHeader('Ingredientes'),
-            const SizedBox(height: 8),
+            // ── INGREDIENTES ───────────────────────────────────────────────
+            Row(
+              children: [
+                _sectionLabel('INGREDIENTES'),
+                const Spacer(),
+                if (_ingredients.isNotEmpty)
+                  Text(
+                    '${_ingredients.length} ${_ingredients.length == 1 ? 'item adicionado' : 'itens adicionados'}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: brandOrange,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _ingredientCtrl,
-                    decoration: _inputDecoration('Ex: 2 xícaras de farinha'),
+                    decoration: _inputDec('Ex: 2 xícaras de farinha'),
                     textCapitalization: TextCapitalization.sentences,
                     onSubmitted: (_) => _addIngredient(),
                   ),
@@ -357,74 +435,292 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
                   child: Container(
                     width: 48,
                     height: 48,
-                    decoration: const BoxDecoration(
-                      gradient: brandGradient,
-                      shape: BoxShape.circle,
+                    decoration: BoxDecoration(
+                      color: brandOrange,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.add, color: Colors.white),
+                    child: const Icon(Icons.add, color: Colors.white, size: 22),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             ..._ingredients.asMap().entries.map((e) => _IngredientTile(
-              text: e.value,
-              onDelete: () =>
-                  setState(() => _ingredients.removeAt(e.key)),
-            )),
+                  text: e.value,
+                  onDelete: () =>
+                      setState(() => _ingredients.removeAt(e.key)),
+                )),
             const SizedBox(height: 20),
 
-            // Passos
-            _sectionHeader('Modo de preparo'),
-            const SizedBox(height: 8),
+            // ── MODO DE PREPARO ────────────────────────────────────────────
+            _sectionLabel('MODO DE PREPARO'),
+            const SizedBox(height: 10),
             ..._steps.asMap().entries.map((e) => _StepTile(
-              index: e.key,
-              step: e.value,
-              onChanged: (updated) =>
-                  setState(() => _steps[e.key] = updated),
-              onDelete: _steps.length > 1
-                  ? () => setState(() => _steps.removeAt(e.key))
-                  : null,
-            )),
+                  index: e.key,
+                  step: e.value,
+                  onChanged: (updated) =>
+                      setState(() => _steps[e.key] = updated),
+                  onDelete: _steps.length > 1
+                      ? () => setState(() => _steps.removeAt(e.key))
+                      : null,
+                )),
             const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () => setState(() =>
-                  _steps.add(const UserRecipeStep(description: ''))),
-              icon: const Icon(Icons.add, color: brandOrange, size: 18),
-              label: const Text('Adicionar passo',
-                  style: TextStyle(color: brandOrange)),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: brandOrange),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // Salvar
             GestureDetector(
-              onTap: _save,
+              onTap: () => setState(
+                  () => _steps.add(const UserRecipeStep(description: ''))),
               child: Container(
-                height: 52,
+                height: 50,
                 decoration: BoxDecoration(
-                  gradient: brandGradient,
-                  borderRadius: BorderRadius.circular(14),
+                  color: Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFFCCCCCC),
+                    style: BorderStyle.solid,
+                  ),
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.check, color: Colors.white),
+                    Icon(Icons.add_circle_outline,
+                        size: 18, color: Color(0xFF888888)),
                     SizedBox(width: 8),
-                    Text('Salvar receita',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16)),
+                    Text(
+                      'Adicionar Passo',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF888888),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
+            const SizedBox(height: 24),
+
+            // ── CAPA DA RECEITA ────────────────────────────────────────────
+            _sectionLabel('CAPA DA RECEITA'),
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: _pickCover,
+              child: Container(
+                height: 160,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAE7EA),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Stack(
+                  fit: StackFit.expand,
+                  alignment: Alignment.center,
+                  children: [
+                    // Foto ou emoji
+                    if (_localImagePath != null)
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.file(
+                          File(_localImagePath!),
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    else
+                      Center(
+                        child: Text(_emoji,
+                            style: const TextStyle(fontSize: 72)),
+                      ),
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        height: 42,
+                        decoration: BoxDecoration(
+                          borderRadius: const BorderRadius.vertical(
+                              bottom: Radius.circular(16)),
+                          color: Colors.black.withOpacity(0.32),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.camera_alt_outlined,
+                                color: Colors.white, size: 17),
+                            SizedBox(width: 6),
+                            Text(
+                              'Alterar Capa',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 28),
+
+            // ── SALVAR ─────────────────────────────────────────────────────
+            GestureDetector(
+              onTap: _save,
+              child: Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: brandGradient,
+                  borderRadius: BorderRadius.circular(50),
+                  boxShadow: [
+                    BoxShadow(
+                      color: brandOrange.withOpacity(0.30),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Text(
+                    'Salvar receita',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickCover() async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDDDDDD),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Capa da receita',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+              const SizedBox(height: 4),
+              const Text('Escolha como quer personalizar',
+                  style: TextStyle(color: Color(0xFF888888), fontSize: 13)),
+              const SizedBox(height: 20),
+              _coverOption(
+                icon: Icons.photo_library_outlined,
+                label: 'Galeria de fotos',
+                subtitle: 'Escolha uma imagem do seu álbum',
+                onTap: () async {
+                  Navigator.pop(context);
+                  final picker = ImagePicker();
+                  final file = await picker.pickImage(
+                      source: ImageSource.gallery, imageQuality: 80);
+                  if (file != null) {
+                    setState(() {
+                      _localImagePath = file.path;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
+              _coverOption(
+                icon: Icons.camera_alt_outlined,
+                label: 'Câmera',
+                subtitle: 'Tire uma foto agora',
+                onTap: () async {
+                  Navigator.pop(context);
+                  final picker = ImagePicker();
+                  final file = await picker.pickImage(
+                      source: ImageSource.camera, imageQuality: 80);
+                  if (file != null) {
+                    setState(() {
+                      _localImagePath = file.path;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
+              _coverOption(
+                icon: Icons.emoji_emotions_outlined,
+                label: 'Usar ícone emoji',
+                subtitle: 'Escolha um emoji como capa',
+                onTap: () {
+                  Navigator.pop(context);
+                  setState(() => _localImagePath = null);
+                  _pickEmoji();
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _coverOption({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8F5F2),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                color: brandPrimaryLight,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: brandPrimary, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: Color(0xFF1C1C1E))),
+                  Text(subtitle,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF888888))),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right,
+                color: Color(0xFFCCCCCC), size: 20),
           ],
         ),
       ),
@@ -451,27 +747,27 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
               runSpacing: 12,
               children: _emojis
                   .map((e) => GestureDetector(
-                onTap: () {
-                  setState(() => _emoji = e);
-                  Navigator.pop(context);
-                },
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: _emoji == e
-                        ? brandOrangeLight
-                        : const Color(0xFFF5F2EE),
-                    borderRadius: BorderRadius.circular(10),
-                    border: _emoji == e
-                        ? Border.all(color: brandOrange, width: 2)
-                        : null,
-                  ),
-                  child: Center(
-                      child: Text(e,
-                          style: const TextStyle(fontSize: 24))),
-                ),
-              ))
+                        onTap: () {
+                          setState(() => _emoji = e);
+                          Navigator.pop(context);
+                        },
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: _emoji == e
+                                ? brandOrangeLight
+                                : const Color(0xFFF5F2EE),
+                            borderRadius: BorderRadius.circular(10),
+                            border: _emoji == e
+                                ? Border.all(color: brandOrange, width: 2)
+                                : null,
+                          ),
+                          child: Center(
+                              child: Text(e,
+                                  style: const TextStyle(fontSize: 24))),
+                        ),
+                      ))
                   .toList(),
             ),
           ],
@@ -480,25 +776,44 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
     );
   }
 
-  Widget _sectionHeader(String title) => Text(title,
-      style: const TextStyle(
-          fontWeight: FontWeight.bold, fontSize: 15, color: brandOrange));
+  Widget _sectionLabel(String text) => Text(
+        text,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF888888),
+          letterSpacing: 1.2,
+        ),
+      );
 
-  InputDecoration _inputDecoration(String hint) => InputDecoration(
-    hintText: hint,
-    hintStyle: const TextStyle(color: textMedium),
-    filled: true,
-    fillColor: Colors.white,
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide.none,
-    ),
-    contentPadding:
-    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-  );
+  InputDecoration _inputDec(String hint) => InputDecoration(
+        hintText: hint,
+        hintStyle:
+            const TextStyle(color: Color(0xFFAAAAAA), fontSize: 14),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: brandOrange, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.red.shade300),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      );
 }
 
-// ── Tiles ─────────────────────────────────────────────────────────────────────
+// ── Tiles ──────────────────────────────────────────────────────────────────────
 
 class _IngredientTile extends StatelessWidget {
   final String text;
@@ -509,25 +824,27 @@ class _IngredientTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           Container(
-            width: 7,
-            height: 7,
+            width: 6,
+            height: 6,
             margin: const EdgeInsets.only(right: 10),
             decoration: const BoxDecoration(
                 color: brandOrange, shape: BoxShape.circle),
           ),
           Expanded(
-              child: Text(text, style: const TextStyle(fontSize: 14))),
+              child: Text(text,
+                  style: const TextStyle(
+                      fontSize: 14, color: neutralDark))),
           GestureDetector(
             onTap: onDelete,
-            child: const Icon(Icons.close, size: 18, color: textMedium),
+            child: const Icon(Icons.close, size: 17, color: Color(0xFFAAAAAA)),
           ),
         ],
       ),
@@ -541,11 +858,12 @@ class _StepTile extends StatefulWidget {
   final ValueChanged<UserRecipeStep> onChanged;
   final VoidCallback? onDelete;
 
-  const _StepTile(
-      {required this.index,
-        required this.step,
-        required this.onChanged,
-        this.onDelete});
+  const _StepTile({
+    required this.index,
+    required this.step,
+    required this.onChanged,
+    this.onDelete,
+  });
 
   @override
   State<_StepTile> createState() => _StepTileState();
@@ -574,26 +892,31 @@ class _StepTileState extends State<_StepTile> {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 28,
-            height: 28,
-            margin: const EdgeInsets.only(right: 10, top: 10),
+            width: 26,
+            height: 26,
+            margin: const EdgeInsets.only(right: 12, top: 2),
             decoration: const BoxDecoration(
-                color: brandOrange, shape: BoxShape.circle),
+              color: Color(0xFFEEEEEE),
+              shape: BoxShape.circle,
+            ),
             child: Center(
-              child: Text('${widget.index + 1}',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12)),
+              child: Text(
+                '${widget.index + 1}',
+                style: const TextStyle(
+                  color: Color(0xFF666666),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
             ),
           ),
           Expanded(
@@ -604,24 +927,24 @@ class _StepTileState extends State<_StepTile> {
                   controller: _ctrl,
                   decoration: const InputDecoration(
                     hintText: 'Descreva o passo...',
-                    hintStyle: TextStyle(color: textMedium),
+                    hintStyle: TextStyle(color: Color(0xFFAAAAAA)),
                     border: InputBorder.none,
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 8),
+                    contentPadding: EdgeInsets.symmetric(vertical: 4),
                   ),
                   maxLines: null,
                   textCapitalization: TextCapitalization.sentences,
-                  onChanged: (v) => widget.onChanged(
-                      widget.step.copyWith(description: v)),
+                  onChanged: (v) =>
+                      widget.onChanged(widget.step.copyWith(description: v)),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Row(
                   children: [
                     const Icon(Icons.timer_outlined,
-                        size: 14, color: textMedium),
+                        size: 13, color: Color(0xFFAAAAAA)),
                     const SizedBox(width: 4),
                     SizedBox(
-                      width: 60,
+                      width: 48,
                       child: TextField(
                         controller: _durationCtrl,
                         keyboardType: TextInputType.number,
@@ -630,13 +953,14 @@ class _StepTileState extends State<_StepTile> {
                         ],
                         decoration: const InputDecoration(
                           hintText: '0',
-                          hintStyle:
-                          TextStyle(color: textMedium, fontSize: 12),
+                          hintStyle: TextStyle(
+                              color: Color(0xFFAAAAAA), fontSize: 12),
                           border: InputBorder.none,
                           isDense: true,
                           contentPadding: EdgeInsets.zero,
                         ),
-                        style: const TextStyle(fontSize: 12),
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF666666)),
                         onChanged: (v) {
                           final mins = int.tryParse(v);
                           widget.onChanged(mins == null || mins == 0
@@ -646,8 +970,8 @@ class _StepTileState extends State<_StepTile> {
                       ),
                     ),
                     const Text(' min',
-                        style:
-                        TextStyle(color: textMedium, fontSize: 12)),
+                        style: TextStyle(
+                            color: Color(0xFFAAAAAA), fontSize: 12)),
                   ],
                 ),
               ],
@@ -657,9 +981,8 @@ class _StepTileState extends State<_StepTile> {
             GestureDetector(
               onTap: widget.onDelete,
               child: const Padding(
-                padding: EdgeInsets.only(top: 8, left: 4),
-                child:
-                Icon(Icons.close, size: 18, color: textMedium),
+                padding: EdgeInsets.only(top: 4, left: 4),
+                child: Icon(Icons.close, size: 17, color: Color(0xFFAAAAAA)),
               ),
             ),
         ],

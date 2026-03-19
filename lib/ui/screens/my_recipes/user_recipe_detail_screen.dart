@@ -1,16 +1,20 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../model/recipe.dart';
 import '../../../model/user_recipe.dart';
+import '../../../providers.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/step_timer_widget.dart';
 import 'package:share_plus/share_plus.dart';
 
-class UserRecipeDetailScreen extends StatelessWidget {
+class UserRecipeDetailScreen extends ConsumerWidget {
   final UserRecipe recipe;
   const UserRecipeDetailScreen({super.key, required this.recipe});
 
-  Recipe _toRecipe() {
+  Recipe _toRecipe(UserRecipe recipe) {
     final totalMinutes = recipe.steps
         .where((s) => s.durationMinutes != null)
         .fold(0, (sum, s) => sum + s.durationMinutes!);
@@ -20,8 +24,14 @@ class UserRecipeDetailScreen extends StatelessWidget {
       description: recipe.description ?? '',
       ingredients: recipe.ingredients,
       steps: recipe.steps.map((s) {
+        // Se durationMinutes definido e a descrição já não menciona tempo,
+        // adiciona ao final para que cooking mode detecte o timer.
+        // Se a descrição já tem tempo (ex: "4 minutos"), não duplica.
         if (s.durationMinutes != null && s.durationMinutes! > 0) {
-          return '${s.description} (${s.durationMinutes} minutos)';
+          final hasTimeInText = parseStepSeconds(s.description) != null;
+          if (!hasTimeInText) {
+            return '${s.description} (${s.durationMinutes} minutos)';
+          }
         }
         return s.description;
       }).toList(),
@@ -32,244 +42,242 @@ class UserRecipeDetailScreen extends StatelessWidget {
     );
   }
 
+  int _totalMinutes(UserRecipe r) => r.steps
+      .where((s) => s.durationMinutes != null)
+      .fold(0, (sum, s) => sum + s.durationMinutes!);
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Observa o provider e usa a versão mais recente da receita pelo ID
+    final current = ref.watch(userRecipesProvider).maybeWhen(
+          data: (list) =>
+              list.where((r) => r.id == recipe.id).firstOrNull ?? recipe,
+          orElse: () => recipe,
+        );
+
+    final topPadding = MediaQuery.of(context).padding.top;
+
     return Scaffold(
-      backgroundColor: brandOrangeLight,
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 220,
-            pinned: true,
-            backgroundColor: brandOrange,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => context.pop(),
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.share_outlined, color: Colors.white),
-                tooltip: 'Compartilhar',
-                onPressed: () => _shareRecipe(recipe),
+      backgroundColor: const Color(0xFFF9F5F2),
+      body: Stack(
+        children: [
+          CustomScrollView(
+            slivers: [
+              // ── Hero ──────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: _HeroSection(
+                  recipe: current,
+                  topPadding: topPadding,
+                  onBack: () => context.pop(),
+                  onShare: () => _shareRecipe(current),
+                  onEdit: () => context.push('/recipe-editor', extra: current),
+                ),
               ),
-              IconButton(
-                icon: const Icon(Icons.edit_outlined, color: Colors.white),
-                tooltip: 'Editar receita',
-                onPressed: () => context.push('/recipe-editor', extra: recipe),
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [brandOrange, brandOrangeDark],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+
+              // ── Descrição ─────────────────────────────────────────
+              if (current.description != null && current.description!.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    child: Text(
+                      current.description!,
+                      style: const TextStyle(
+                        color: textMedium,
+                        fontSize: 14,
+                        height: 1.6,
+                      ),
+                    ),
                   ),
                 ),
-                child: Column(
+
+              // ── Ingredientes ──────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+                  child: Text(
+                    'Ingredientes',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 20,
+                          letterSpacing: -0.4,
+                          color: neutralDark,
+                        ),
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (_, i) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: brandOrange.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.check,
+                              size: 12,
+                              color: brandOrange,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              current.ingredients[i],
+                              style: const TextStyle(
+                                fontSize: 14,
+                                height: 1.5,
+                                color: neutralDark,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    childCount: current.ingredients.length,
+                  ),
+                ),
+              ),
+
+              // ── Modo de Preparo ───────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Modo de Preparo',
+                          style:
+                              Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 20,
+                                    letterSpacing: -0.4,
+                                    color: neutralDark,
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 120),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (_, i) {
+                      final step = current.steps[i];
+                      // Prefere tempo do texto da descrição (ex: "4 minutos");
+                      // usa durationMinutes só se descrição não tiver tempo
+                      final secsFromText = parseStepSeconds(step.description);
+                      final secs = secsFromText ??
+                          (step.durationMinutes != null && step.durationMinutes! > 0
+                              ? step.durationMinutes! * 60
+                              : null);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 18),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 30,
+                              height: 30,
+                              decoration: const BoxDecoration(
+                                color: brandOrange,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  '${i + 1}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 5),
+                                    child: Text(
+                                      step.description,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        height: 1.6,
+                                        color: neutralDark,
+                                      ),
+                                    ),
+                                  ),
+                                  if (secs != null) ...[
+                                    const SizedBox(height: 8),
+                                    StepTimerWidget(totalSeconds: secs),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    childCount: current.steps.length,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // ── Botão fixo no fundo ───────────────────────────────────
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(context).padding.bottom + 16,
+            child: GestureDetector(
+              onTap: () => context.push('/cooking', extra: _toRecipe(current)),
+              child: Container(
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: brandGradient,
+                  borderRadius: BorderRadius.circular(50),
+                  boxShadow: [
+                    BoxShadow(
+                      color: brandOrange.withValues(alpha: 0.35),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 60),
-                    Text(recipe.coverEmoji,
-                        style: const TextStyle(fontSize: 72)),
-                    const SizedBox(height: 8),
+                    Icon(Icons.restaurant_menu,
+                        color: Colors.white, size: 18),
+                    SizedBox(width: 10),
                     Text(
-                      recipe.name,
-                      style: const TextStyle(
+                      'Iniciar Modo Cozinha',
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        letterSpacing: -0.2,
                       ),
-                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
               ),
             ),
           ),
-
-          // Badges
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _badge(Icons.list_alt, '${recipe.steps.length} passos'),
-                  _badge(Icons.kitchen_outlined,
-                      '${recipe.ingredients.length} ingredientes'),
-                  if (recipe.isPublic)
-                    _badge(Icons.public, 'Pública', color: badgeGreen),
-                  if (recipe.category != null)
-                    _badge(Icons.category_outlined, recipe.category!,
-                        color: brandOrange),
-                  if (recipe.subcategory != null)
-                    _badge(Icons.label_outline, recipe.subcategory!,
-                        color: const Color(0xFFE07B39)),
-                  ...recipe.tags.map(
-                    (tag) => _badge(Icons.local_offer_outlined, tag,
-                        color: const Color(0xFF888888)),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Descrição
-          if (recipe.description != null && recipe.description!.isNotEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: Text(
-                  recipe.description!,
-                  style: const TextStyle(
-                      color: textMedium, fontSize: 14, height: 1.6),
-                ),
-              ),
-            ),
-
-          // Ingredientes
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-              child: Text('Ingredientes',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                    (_, i) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(top: 6),
-                        child: Icon(Icons.circle, size: 6, color: brandOrange),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(recipe.ingredients[i],
-                            style: const TextStyle(fontSize: 14, height: 1.5)),
-                      ),
-                    ],
-                  ),
-                ),
-                childCount: recipe.ingredients.length,
-              ),
-            ),
-          ),
-
-          // Passos
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-              child: Text('Modo de preparo',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                    (_, i) {
-                  final step = recipe.steps[i];
-                  final secs = parseStepSeconds(step.description +
-                      (step.durationMinutes != null
-                          ? ' ${step.durationMinutes} minutos'
-                          : ''));
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 28,
-                          height: 28,
-                          decoration: const BoxDecoration(
-                            color: brandOrange,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text('${i + 1}',
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(step.description,
-                                  style: const TextStyle(
-                                      fontSize: 14, height: 1.6)),
-                              if (secs != null) ...[
-                                const SizedBox(height: 8),
-                                StepTimerWidget(totalSeconds: secs),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                childCount: recipe.steps.length,
-              ),
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: ElevatedButton.icon(
-            onPressed: () => context.push('/cooking', extra: _toRecipe()),
-            icon: const Icon(Icons.restaurant_menu, color: Colors.white),
-            label: const Text('Iniciar Modo Cozinha 👨‍🍳',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: brandOrange,
-              minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _badge(IconData icon, String label, {Color color = brandOrange}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12, color: color, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -293,7 +301,204 @@ class UserRecipeDetailScreen extends StatelessWidget {
     }
     buf.writeln();
     buf.writeln('Feito com Cozinhei 🍽️');
-
     Share.share(buf.toString());
+  }
+}
+
+// ── Hero Section ──────────────────────────────────────────────────────────────
+
+class _HeroSection extends StatelessWidget {
+  final UserRecipe recipe;
+  final double topPadding;
+  final VoidCallback onBack;
+  final VoidCallback onShare;
+  final VoidCallback onEdit;
+
+  const _HeroSection({
+    required this.recipe,
+    required this.topPadding,
+    required this.onBack,
+    required this.onShare,
+    required this.onEdit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage = recipe.imageUrl != null && recipe.imageUrl!.isNotEmpty;
+
+    return SizedBox(
+      height: 300,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // ── Background ──────────────────────────────────────────────
+          if (hasImage)
+            _buildCoverImage(recipe.imageUrl!)
+          else
+            _gradientBackground(),
+
+          // ── Emoji centralizado (quando sem foto) ─────────────────────
+          if (!hasImage)
+            Positioned(
+              top: topPadding + 52,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Text(
+                  recipe.coverEmoji,
+                  style: const TextStyle(fontSize: 72, height: 1.0),
+                ),
+              ),
+            ),
+
+          // ── Overlay escuro degradê no fundo ──────────────────────────
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: hasImage ? 0.15 : 0.0),
+                  Colors.black.withValues(alpha: 0.0),
+                  Colors.black.withValues(alpha: 0.55),
+                ],
+                stops: const [0.0, 0.35, 1.0],
+              ),
+            ),
+          ),
+
+          // ── Botão voltar ────────────────────────────────────────────
+          Positioned(
+            top: topPadding + 8,
+            left: 12,
+            child: _circleButton(Icons.arrow_back_ios_new, onBack, size: 16),
+          ),
+
+          // ── Share + Edit ────────────────────────────────────────────
+          Positioned(
+            top: topPadding + 8,
+            right: 12,
+            child: Row(
+              children: [
+                _circleButton(Icons.share_outlined, onShare),
+                const SizedBox(width: 8),
+                _circleButton(Icons.edit_outlined, onEdit),
+              ],
+            ),
+          ),
+
+          // ── Nome + badges na base ────────────────────────────────────
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: 18,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  recipe.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.8,
+                    height: 1.1,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black38,
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _heroBadge('${recipe.steps.length} passo${recipe.steps.length == 1 ? '' : 's'}'),
+                    _heroBadge('${recipe.ingredients.length} ingrediente${recipe.ingredients.length == 1 ? '' : 's'}'),
+                    if (recipe.isPublic) _heroBadge('Pública', highlight: true),
+                    if (recipe.category != null) _heroBadge(recipe.category!),
+                    if (recipe.subcategory != null) _heroBadge(recipe.subcategory!),
+                    ...recipe.tags.map((t) => _heroBadge(t)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCoverImage(String url) {
+    final isLocal = url.startsWith('/') || url.startsWith('file://');
+    if (isLocal) {
+      return Image.file(
+        File(url.replaceFirst('file://', '')),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _gradientBackground(),
+      );
+    }
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _gradientBackground(),
+    );
+  }
+
+  Widget _gradientBackground() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFAE310E), brandOrange],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+    );
+  }
+
+  Widget _circleButton(IconData icon, VoidCallback onTap, {double size = 18}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.28),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: Colors.white, size: size),
+      ),
+    );
+  }
+
+  Widget _heroBadge(String label, {bool highlight = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: highlight
+            ? brandOrange.withValues(alpha: 0.9)
+            : Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.30),
+          width: 0.8,
+        ),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
   }
 }

@@ -17,6 +17,7 @@ class _CookingModeScreenState extends State<CookingModeScreen> {
   String _cleanStep(String step) {
     return step
         .replaceAll(RegExp(r'^Passo\s+\d+[:.)]?\s*', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s*\(\d+\s*minutos?\)', caseSensitive: false), '')
         .trim();
   }
 
@@ -27,196 +28,178 @@ class _CookingModeScreenState extends State<CookingModeScreen> {
     final secs = parseStepSeconds(steps[_currentStep]);
     final isLast = _currentStep == steps.length - 1;
     final top = MediaQuery.of(context).padding.top;
+    final bottom = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
-      backgroundColor: brandOrangeLight,
+      backgroundColor: const Color(0xFFF5F2EF),
       body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
 
-          // ── Header ──────────────────────────────────────────
+          // ── Header ─────────────────────────────────────────────
           Container(
             color: Colors.white,
-            padding: EdgeInsets.fromLTRB(20, top + 16, 20, 16),
+            padding: EdgeInsets.fromLTRB(16, top + 12, 16, 12),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Botão voltar
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Padding(
-                    padding: EdgeInsets.only(top: 2, right: 12),
-                    child: Icon(Icons.arrow_back_ios,
-                        size: 20, color: Color(0xFF333333)),
-                  ),
+                  child: const Icon(Icons.close,
+                      size: 22, color: Color(0xFF333333)),
                 ),
-
-                // Info da receita
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.recipe.name,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1C1C1E),
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          if (widget.recipe.servings.isNotEmpty &&
-                              widget.recipe.servings != '-') ...[
-                            const Icon(Icons.people_outline,
-                                size: 14, color: textMedium),
-                            const SizedBox(width: 4),
-                            Text(widget.recipe.servings,
-                                style: const TextStyle(
-                                    fontSize: 13, color: textMedium)),
-                            const SizedBox(width: 16),
-                          ],
-                          if (widget.recipe.cookingTime.isNotEmpty &&
-                              widget.recipe.cookingTime != '-') ...[
-                            const Icon(Icons.schedule,
-                                size: 14, color: textMedium),
-                            const SizedBox(width: 4),
-                            Text(widget.recipe.cookingTime,
-                                style: const TextStyle(
-                                    fontSize: 13, color: textMedium)),
-                          ],
-                        ],
-                      ),
-                    ],
+                  child: Text(
+                    'Passo ${_currentStep + 1} de ${steps.length}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: neutralDark,
+                      letterSpacing: -0.1,
+                    ),
                   ),
                 ),
-
-                // Contador de passo
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${_currentStep + 1}/${steps.length}',
-                      style: const TextStyle(
-                        color: brandOrange,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text('passos',
-                        style: TextStyle(fontSize: 11, color: textMedium)),
-                  ],
-                ),
+                const SizedBox(width: 22),
               ],
             ),
           ),
 
-          // Barra de progresso
+          // ── Progress bar ────────────────────────────────────────
           LinearProgressIndicator(
             value: (_currentStep + 1) / steps.length,
             backgroundColor: const Color(0xFFEDE8E3),
             valueColor: const AlwaysStoppedAnimation(brandOrange),
-            minHeight: 3,
+            minHeight: 2,
           ),
 
-          // ── Conteúdo do passo ────────────────────────────────
+          // ── Conteúdo ────────────────────────────────────────────
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 260),
-              layoutBuilder: (currentChild, previousChildren) => Stack(
-                alignment: Alignment.topLeft,
-                children: [
-                  ...previousChildren,
-                  if (currentChild != null) currentChild,
-                ],
-              ),
               transitionBuilder: (child, anim) => FadeTransition(
-              opacity: anim,
+                opacity: anim,
                 child: SlideTransition(
                   position: Tween(
-                    begin: const Offset(0, 0.03),
+                    begin: const Offset(0, 0.04),
                     end: Offset.zero,
                   ).animate(CurvedAnimation(
                       parent: anim, curve: Curves.easeOut)),
                   child: child,
                 ),
               ),
-              child: SingleChildScrollView(
+              child: Column(
                 key: ValueKey(_currentStep),
-                padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Label
-                    Text(
-                      'Passo ${_currentStep + 1}',
-                      style: const TextStyle(
-                        color: brandOrange,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.8,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // ── Header fixo — sempre na mesma posição ──────────
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          'MODO COZINHA',
+                          style: TextStyle(
+                            color: brandOrange,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          widget.recipe.name,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w700,
+                            color: neutralDark,
+                            letterSpacing: -0.6,
+                            height: 1.15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Card + timer (scrollável) ──────────────────────
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // Card com o texto do passo
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 18),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              stepText,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w400,
+                                height: 1.6,
+                                color: neutralDark,
+                              ),
+                            ),
+                          ),
+
+                          // Timer circular
+                          if (secs != null) ...[
+                            const SizedBox(height: 28),
+                            StepTimerWidget(totalSeconds: secs, circular: true),
+                          ],
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-
-                    // Texto
-                    Text(
-                      stepText,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w500,
-                        height: 1.7,
-                        color: Color(0xFF1C1C1E),
-                      ),
-                    ),
-
-                    // Timer
-                    if (secs != null) ...[
-                      const SizedBox(height: 24),
-                      const Divider(color: Color(0xFFE5E0DA)),
-                      const SizedBox(height: 20),
-                      StepTimerWidget(totalSeconds: secs, large: true),
-                    ],
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
 
-          // ── Navegação ────────────────────────────────────────
+          // ── Botão de navegação ──────────────────────────────────
           Container(
-            padding: EdgeInsets.fromLTRB(
-                20, 12, 20, MediaQuery.of(context).padding.bottom + 16),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                  top: BorderSide(color: Color(0xFFEDE8E3), width: 1)),
-            ),
+            padding: EdgeInsets.fromLTRB(20, 12, 20, bottom + 16),
+            color: Colors.white,
             child: Row(
               children: [
                 if (_currentStep > 0) ...[
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => setState(() => _currentStep--),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(50),
-                        side: const BorderSide(color: Color(0xFFDDD8D3)),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14)),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.arrow_back_ios,
-                              size: 12, color: Color(0xFF666666)),
-                          SizedBox(width: 4),
-                          Text('Anterior',
-                              style: TextStyle(color: Color(0xFF666666))),
-                        ],
+                    child: GestureDetector(
+                      onTap: () => setState(() => _currentStep--),
+                      child: Container(
+                        height: 54,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0EDEA),
+                          borderRadius: BorderRadius.circular(50),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.arrow_back_ios,
+                                size: 12, color: Color(0xFF555555)),
+                            SizedBox(width: 4),
+                            Text('Anterior',
+                                style: TextStyle(
+                                  color: Color(0xFF555555),
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                )),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -224,32 +207,50 @@ class _CookingModeScreenState extends State<CookingModeScreen> {
                 ],
                 Expanded(
                   flex: 2,
-                  child: ElevatedButton(
-                    onPressed: isLast
+                  child: GestureDetector(
+                    onTap: isLast
                         ? () => Navigator.pop(context)
                         : () => setState(() => _currentStep++),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: isLast ? badgeGreen : brandOrange,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(50),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                      elevation: 0,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          isLast ? 'Finalizar' : 'Próximo',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 15),
-                        ),
-                        const SizedBox(width: 6),
-                        Icon(
-                          isLast ? Icons.check : Icons.arrow_forward_ios,
-                          size: 13,
-                        ),
-                      ],
+                    child: Container(
+                      height: 54,
+                      decoration: BoxDecoration(
+                        gradient: isLast
+                            ? const LinearGradient(
+                                colors: [Color(0xFF2E7D32), Color(0xFF43A047)],
+                              )
+                            : brandGradient,
+                        borderRadius: BorderRadius.circular(50),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isLast
+                                    ? const Color(0xFF2E7D32)
+                                    : brandOrange)
+                                .withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isLast ? Icons.check : Icons.arrow_forward_ios,
+                            color: Colors.white,
+                            size: isLast ? 16 : 13,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            isLast ? 'Finalizar Passo' : 'Próximo Passo',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

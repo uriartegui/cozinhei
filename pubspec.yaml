@@ -29,6 +29,7 @@ dependencies:
 
   # Imagens
   cached_network_image: ^3.3.1
+  image_picker: ^1.1.2
 
   # Estado
   flutter_riverpod: ^2.4.10

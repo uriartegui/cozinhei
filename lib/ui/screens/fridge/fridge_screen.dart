@@ -83,7 +83,7 @@ class _FridgeScreenState extends ConsumerState<FridgeScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: brandOrange),
+                        borderSide: const BorderSide(color: brandTertiary),
                       ),
                       filled: true,
                       fillColor: surfaceGray,
@@ -99,7 +99,7 @@ class _FridgeScreenState extends ConsumerState<FridgeScreen> {
                   child: ElevatedButton(
                     onPressed: _addItem,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: brandOrange,
+                      backgroundColor: brandTertiary,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14)),
                       padding: EdgeInsets.zero,

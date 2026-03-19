@@ -62,6 +62,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _showServingsDialog(List<String> chips, String? selectedCategory,
       String? selectedSubcategory, Set<String> selectedTags) {
+    // ── Se não tem ingredientes, pergunta primeiro ──────────────
+    if (chips.isEmpty) {
+      _showNoIngredientsDialog(selectedCategory, selectedSubcategory, selectedTags);
+      return;
+    }
+    _openServingsDialog(chips, selectedCategory, selectedSubcategory, selectedTags);
+  }
+
+  void _openServingsDialog(List<String> chips, String? selectedCategory,
+      String? selectedSubcategory, Set<String> selectedTags) {
     _servingsController.clear();
     showDialog(
       context: context,
@@ -70,33 +80,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onGenerate: (servings) {
           FocusScope.of(context).unfocus();
           Navigator.of(context, rootNavigator: true).pop();
-          if (chips.isEmpty && selectedCategory == null && selectedTags.isEmpty) {
-            _showNoIngredientsDialog(selectedCategory, selectedSubcategory, selectedTags, servings);
-          } else {
-            final notifier = ref.read(homeProvider.notifier);
-            notifier.onQueryChange(
-                _buildQuery(chips, selectedCategory, selectedSubcategory, selectedTags));
-            notifier.generateRecipes(servings: servings);
-          }
+          final notifier = ref.read(homeProvider.notifier);
+          final q = _buildQuery(chips, selectedCategory, selectedSubcategory, selectedTags);
+          notifier.onQueryChange(q.isEmpty ? 'receitas variadas' : q);
+          notifier.generateRecipes(servings: servings);
         },
       ),
     );
   }
 
   void _showNoIngredientsDialog(String? selectedCategory,
-      String? selectedSubcategory, Set<String> selectedTags, int servings) {
+      String? selectedSubcategory, Set<String> selectedTags) {
     showDialog(
       context: context,
       builder: (dialogContext) => _NoIngredientsDialog(
         onGenerateWithout: () {
           Navigator.of(dialogContext).pop();
-          final query = selectedCategory != null
-              ? '$selectedCategory${selectedSubcategory != null ? ': $selectedSubcategory' : ''}'
-                  '${selectedTags.isNotEmpty ? ' - estilo: ${selectedTags.join(', ')}' : ''}'
-              : 'receitas variadas';
-          final notifier = ref.read(homeProvider.notifier);
-          notifier.onQueryChange(query);
-          notifier.generateRecipes(servings: servings);
+          // Depois de confirmar sem ingredientes, pede a quantidade
+          _openServingsDialog([], selectedCategory, selectedSubcategory, selectedTags);
         },
       ),
     );
@@ -145,7 +146,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             .titleLarge
                             ?.copyWith(
                                 fontWeight: FontWeight.w800,
-                                color: const Color(0xFF1B1B1D),
+                                color: neutralDark,
                                 letterSpacing: -0.3)),
                   ],
                 ),
@@ -159,7 +160,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     fontWeight: FontWeight.w700,
                     height: 1.1,
                     letterSpacing: -0.8,
-                    color: Color(0xFF1B1B1D),
+                    color: neutralDark,
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -212,7 +213,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               fontWeight: FontWeight.w500,
                               color: isSelected
                                   ? Colors.white
-                                  : const Color(0xFF1B1B1D),
+                                  : neutralDark,
                             ),
                           ),
                         ),
@@ -305,7 +306,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 fontSize: 12,
                                 color: isSelected
                                     ? brandOrange
-                                    : const Color(0xFF1B1B1D),
+                                    : neutralDark,
                               ),
                             ),
                           ),
@@ -361,7 +362,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: const Icon(Icons.add,
-                            color: Color(0xFF1B1B1D)),
+                            color: neutralDark),
                       ),
                     ),
                   ],
@@ -609,7 +610,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF1B1B1D),
+                          color: neutralDark,
                         )),
                     if (fridgeSuggestions is FridgeSuggestionsSuccess)
                       GestureDetector(
@@ -852,7 +853,7 @@ class _SkeletonCardState extends State<_SkeletonCard>
 
 // ── Dialogs ───────────────────────────────────────────────────────────────────
 
-class _ServingsDialog extends StatelessWidget {
+class _ServingsDialog extends StatefulWidget {
   final TextEditingController controller;
   final void Function(int servings) onGenerate;
 
@@ -860,70 +861,172 @@ class _ServingsDialog extends StatelessWidget {
       {required this.controller, required this.onGenerate});
 
   @override
+  State<_ServingsDialog> createState() => _ServingsDialogState();
+}
+
+class _ServingsDialogState extends State<_ServingsDialog> {
+  String? _error;
+
+  void _submit() {
+    final raw = int.tryParse(widget.controller.text.trim());
+    if (raw == null || raw < 1) {
+      setState(() => _error = 'Informe um número entre 1 e 100');
+      return;
+    }
+    if (raw > 100) {
+      setState(() => _error = 'O máximo é 100 pessoas');
+      return;
+    }
+    setState(() => _error = null);
+    widget.onGenerate(raw);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      backgroundColor: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Título + fechar ────────────────────────────────────
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Spacer(),
-                const Text('Para quantas pessoas? 👨‍👩‍👧‍👦',
+                const Expanded(
+                  child: Text(
+                    'Para quantas pessoas?',
                     style: TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16)),
-                const Spacer(),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                      color: Color(0xFF1C1C1E),
+                      letterSpacing: -0.3,
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.close, color: Colors.grey),
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFF0EDEA),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close,
+                        color: Color(0xFF888888), size: 14),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
+
+            // ── Descrição ──────────────────────────────────────────
             const Text(
-              'A IA vai ajustar as quantidades dos ingredientes para o número certo de pessoas.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: textMedium, fontSize: 13),
+              'As quantidades dos ingredientes serão ajustadas para o número de pessoas informado.',
+              style: TextStyle(
+                color: textMedium,
+                fontSize: 13,
+                height: 1.55,
+              ),
             ),
             const SizedBox(height: 16),
+
+            // ── Campo de texto ─────────────────────────────────────
             TextField(
-              controller: controller,
+              controller: widget.controller,
               keyboardType: TextInputType.number,
               inputFormatters: [
                 FilteringTextInputFormatter.digitsOnly,
                 LengthLimitingTextInputFormatter(3),
               ],
+              onChanged: (_) {
+                if (_error != null) setState(() => _error = null);
+              },
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF1C1C1E),
+              ),
               decoration: InputDecoration(
                 hintText: 'Quantidade de pessoas',
+                hintStyle: const TextStyle(
+                  color: Color(0xFFBBBBBB),
+                  fontSize: 14,
+                ),
+                prefixIcon: const Icon(
+                  Icons.group_outlined,
+                  color: Color(0xFFBBBBBB),
+                  size: 20,
+                ),
+                errorText: _error,
+                errorStyle: const TextStyle(fontSize: 12),
+                filled: true,
+                fillColor: const Color(0xFFF5F2EE),
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: brandOrange, width: 1.5),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: Colors.redAccent, width: 1.5),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: Colors.redAccent, width: 1.5),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 14),
               ),
             ),
             const SizedBox(height: 16),
+
+            // ── Botão ──────────────────────────────────────────────
             GestureDetector(
-              onTap: () {
-                final servings =
-                    (int.tryParse(controller.text) ?? 4).clamp(1, 100);
-                onGenerate(servings);
-              },
+              onTap: _submit,
               child: Container(
-                height: 50,
+                height: 52,
+                width: double.infinity,
                 decoration: BoxDecoration(
                   gradient: brandGradient,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(50),
+                  boxShadow: [
+                    BoxShadow(
+                      color: brandOrange.withValues(alpha: 0.30),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.auto_awesome, color: Colors.white, size: 18),
                     SizedBox(width: 8),
-                    Text('Gerar Receitas',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold)),
+                    Text(
+                      'Gerar Receitas',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -944,125 +1047,172 @@ class _NoIngredientsDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      backgroundColor: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // ── X fechar ──────────────────────────────────────────
             Align(
               alignment: Alignment.topRight,
               child: GestureDetector(
                 onTap: () => Navigator.pop(context),
-                child: const Icon(Icons.close, color: Colors.grey),
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF0EDEA),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close,
+                      color: Color(0xFF888888), size: 14),
+                ),
               ),
             ),
+            const SizedBox(height: 8),
+
+            // ── Ícone de alerta ────────────────────────────────────
             Container(
               width: 64,
               height: 64,
-              decoration: const BoxDecoration(
-                gradient: RadialGradient(
-                    colors: [Color(0xFFFFE0CC), Color(0xFFFFF3EC)]),
+              decoration: BoxDecoration(
+                color: brandOrange.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Center(
                 child: Container(
-                  width: 44,
-                  height: 44,
+                  width: 42,
+                  height: 42,
                   decoration: const BoxDecoration(
                     gradient: brandGradient,
                     shape: BoxShape.circle,
                   ),
-                  child: const Center(
-                    child: Text('!',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 22)),
+                  child: const Icon(
+                    Icons.warning_rounded,
+                    color: Colors.white,
+                    size: 22,
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            const Text('Nenhum ingrediente\nadicionado',
-                textAlign: TextAlign.center,
-                style:
-                    TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            const SizedBox(height: 12),
+
+            // ── Título ─────────────────────────────────────────────
+            const Text(
+              'Nenhum ingrediente\nadicionado',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                color: Color(0xFF1C1C1E),
+                letterSpacing: -0.3,
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // ── Instrução principal ────────────────────────────────
             RichText(
               textAlign: TextAlign.center,
               text: TextSpan(
-                style: const TextStyle(color: Colors.black87, fontSize: 14),
+                style: const TextStyle(
+                    color: textMedium, fontSize: 13, height: 1.5),
                 children: [
                   const TextSpan(text: 'Escreva os ingredientes, clique no '),
-                  const TextSpan(
-                      text: '+',
-                      style: TextStyle(
-                          color: brandOrange,
-                          fontWeight: FontWeight.bold)),
+                  TextSpan(
+                    text: '+',
+                    style: TextStyle(
+                        color: brandOrange, fontWeight: FontWeight.w700),
+                  ),
                   const TextSpan(text: ' e depois em '),
-                  const TextSpan(
-                      text: 'Gerar Receitas.',
-                      style: TextStyle(
-                          color: brandOrange,
-                          fontWeight: FontWeight.bold)),
+                  TextSpan(
+                    text: 'Gerar Receitas.',
+                    style: TextStyle(
+                        color: brandOrange, fontWeight: FontWeight.w700),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 12),
+
+            // ── Dica secundária ────────────────────────────────────
             Container(
-              padding: const EdgeInsets.all(12),
+              width: double.infinity,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: brandOrangeLight,
+                color: brandOrange.withValues(alpha: 0.07),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: brandOrange.withValues(alpha: 0.18),
+                  width: 1,
+                ),
               ),
               child: RichText(
                 textAlign: TextAlign.center,
-                text: const TextSpan(
-                  style: TextStyle(color: Colors.black87, fontSize: 13),
+                text: TextSpan(
+                  style: const TextStyle(
+                      color: textMedium, fontSize: 12, height: 1.5),
                   children: [
+                    const TextSpan(
+                        text: 'Caso queira continuar sem ingredientes, '
+                            'clique em '),
                     TextSpan(
-                        text:
-                            'Caso queira continuar sem ingredientes, clique em '),
-                    TextSpan(
-                        text: '"Gerar sem ingrediente".',
-                        style: TextStyle(
-                            color: brandOrange,
-                            fontWeight: FontWeight.bold)),
+                      text: '"Gerar sem ingrediente".',
+                      style: TextStyle(
+                          color: brandOrange, fontWeight: FontWeight.w600),
+                    ),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 20),
+
+            // ── Botão principal ────────────────────────────────────
             GestureDetector(
               onTap: onGenerateWithout,
               child: Container(
-                height: 50,
+                height: 52,
+                width: double.infinity,
                 decoration: BoxDecoration(
                   gradient: brandGradient,
                   borderRadius: BorderRadius.circular(50),
+                  boxShadow: [
+                    BoxShadow(
+                      color: brandOrange.withValues(alpha: 0.30),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: const Center(
-                  child: Text('Gerar sem ingrediente',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold)),
+                  child: Text(
+                    'Gerar sem ingrediente',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
+
+            // ── Link voltar ────────────────────────────────────────
             GestureDetector(
               onTap: () => Navigator.pop(context),
-              child: Container(
-                height: 50,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(50),
-                ),
-                child: const Center(
-                  child: Text('Voltar',
-                      style: TextStyle(
-                          color: Colors.black54,
-                          fontWeight: FontWeight.w500)),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 6),
+                child: Text(
+                  'Voltar e editar',
+                  style: TextStyle(
+                    color: textMedium,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ),
             ),
