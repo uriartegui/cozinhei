@@ -1,20 +1,16 @@
 workflows:
   ios-workflow:
-    name: iOS Build
+    name: iOS Build (Simulator)
     max_build_duration: 60
     environment:
       flutter: stable
       xcode: latest
       cocoapods: default
-      vars:
-        BUNDLE_ID: "com.guilherme.cozinhei"
-      ios_signing:
-        distribution_type: development
-        bundle_identifier: com.guilherme.cozinhei
 
     scripts:
       - name: Gerar constants.dart
         script: |
+          mkdir -p lib/core
           cat > lib/core/constants.dart << EOF
           class AppConstants {
             static const String groqApiKey = '$GROQ_API_KEY';
@@ -30,12 +26,12 @@ workflows:
       - name: Gerar código Drift
         script: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Build iOS
+      - name: Build iOS Simulator
         script: |
-          flutter build ipa --release
+          flutter build ios --debug --simulator --no-codesign
 
     artifacts:
-      - build/ios/ipa/*.ipa
+      - build/ios/iphonesimulator/**/*.app
 
     publishing:
       email:
