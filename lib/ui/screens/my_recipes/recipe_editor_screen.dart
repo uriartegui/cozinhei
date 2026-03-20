@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import '../../../data/repository/community_recipe_repository.dart';
 import '../../../di/injection.dart';
@@ -66,7 +67,15 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
     if (r?.imageUrl != null && (r!.imageUrl!.startsWith('/') || r.imageUrl!.startsWith('file://'))) {
       _localImagePath = r.imageUrl!.replaceFirst('file://', '');
     }
-    _authorCtrl = TextEditingController(text: r?.authorName ?? '');
+    // Pré-preenche o autor com o usuário logado; edição livre caso queira apelido
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    final defaultAuthor = r?.authorName?.isNotEmpty == true
+        ? r!.authorName!
+        : (currentUser?.userMetadata?['display_name'] as String? ??
+            currentUser?.userMetadata?['full_name'] as String? ??
+            currentUser?.email ??
+            '');
+    _authorCtrl = TextEditingController(text: defaultAuthor);
     _category = r?.category;
     _subcategory = r?.subcategory;
     _tags = List.from(r?.tags ?? []);

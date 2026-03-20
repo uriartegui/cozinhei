@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../providers.dart';
 import '../../viewmodel/house_notifier.dart';
 import '../screens/home/home_screen.dart';
@@ -11,6 +12,7 @@ import '../screens/my_recipes/recipe_editor_screen.dart';
 import '../screens/recipe/recipe_detail_screen.dart';
 import '../screens/recipe/cooking_mode_screen.dart';
 import '../screens/house/house_setup_screen.dart';
+import '../screens/auth/login_screen.dart';
 import '../../model/recipe.dart';
 import '../../model/user_recipe.dart';
 import '../../ui/theme/app_colors.dart';
@@ -28,6 +30,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/house-setup',
         builder: (_, __) => const HouseSetupScreen(),
+      ),
+      GoRoute(
+        path: '/login',
+        builder: (_, state) => LoginScreen(
+          redirectTo: state.uri.queryParameters['redirect'],
+        ),
       ),
       ShellRoute(
         builder: (context, state, child) => _MainScaffold(child: child),
@@ -69,6 +77,8 @@ class _RouterNotifier extends ChangeNotifier {
 
   _RouterNotifier(this._ref) {
     _ref.listen(houseProvider, (_, __) => notifyListeners());
+    _ref.listen(isUserActivatedProvider, (_, __) => notifyListeners());
+    Supabase.instance.client.auth.onAuthStateChange.listen((_) => notifyListeners());
   }
 
   String? redirect(BuildContext context, GoRouterState state) {
@@ -76,11 +86,27 @@ class _RouterNotifier extends ChangeNotifier {
     final location = state.matchedLocation;
     final isSetupRoute = location == '/house-setup';
     final isFridgeRoute = location == '/fridge';
+    final isMyRecipesRoute = location == '/my-recipes';
+    final isLoginRoute = location == '/login';
+
+    final user = _ref.read(authProvider);
+    final isLoggedIn = user != null;
+
+    // Rotas protegidas → redireciona para login se não autenticado
+    if ((isFridgeRoute || isMyRecipesRoute) && !isLoggedIn) {
+      final from = Uri.encodeComponent(location);
+      return '/login?redirect=$from';
+    }
+
+    // Se já está logado e tenta ir para login → vai para home
+    if (isLoginRoute && isLoggedIn) {
+      return '/';
+    }
 
     if (houseState.status == HouseStatus.loading) return null;
 
     // Só redireciona para setup se tentar acessar a geladeira sem casa
-    if (isFridgeRoute && houseState.status == HouseStatus.noHouse) {
+    if (isFridgeRoute && isLoggedIn && houseState.status == HouseStatus.noHouse) {
       return '/house-setup';
     }
 

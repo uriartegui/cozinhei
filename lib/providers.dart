@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'data/repository/recipe_repository.dart';
 import 'data/repository/fridge_repository.dart';
 import 'data/repository/community_recipe_repository.dart';
@@ -85,3 +86,15 @@ final userRecipesProvider =
 StateNotifierProvider<UserRecipesNotifier, AsyncValue<List<UserRecipe>>>(
       (ref) => UserRecipesNotifier(ref.read(userRecipeRepositoryProvider)),
 );
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+
+// Controla se o usuário ativou o login (modo guest por padrão)
+final isUserActivatedProvider = StateProvider<bool>((ref) => false);
+
+// Retorna o usuário real APENAS se foi ativado (não automático)
+final authProvider = Provider<User?>((ref) {
+  final isActivated = ref.watch(isUserActivatedProvider);
+  if (!isActivated) return null;
+  return Supabase.instance.client.auth.currentUser;
+});

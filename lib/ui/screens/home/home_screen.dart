@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../model/recipe_filter.dart';
 import '../../../providers.dart';
 import '../../../viewmodel/home_state.dart';
@@ -140,14 +141,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     const Icon(Icons.restaurant_menu,
                         color: brandOrange, size: 22),
                     const SizedBox(width: 8),
-                    Text('Olá, Chef!',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: neutralDark,
-                                letterSpacing: -0.3)),
+                    Expanded(
+                      child: Text('Olá, Chef!',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: neutralDark,
+                                  letterSpacing: -0.3)),
+                    ),
+                    _ProfileButton(),
                   ],
                 ),
                 const SizedBox(height: 20),
@@ -167,7 +171,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                 // Fridge CTA — link de texto minimalista
                 GestureDetector(
-                  onTap: () => _showFridgeSheet(context, notifier),
+                  onTap: () {
+                    _showFridgeSheet(context, notifier);
+                  },
                   child: const Text(
                     'Ver receitas da sua geladeira →',
                     style: TextStyle(
@@ -1196,6 +1202,202 @@ class _NoIngredientsDialog extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Profile Button ────────────────────────────────────────────────────────────
+
+class _ProfileButton extends ConsumerWidget {
+  const _ProfileButton();
+
+  void _showProfileSheet(BuildContext context, WidgetRef ref) {
+    final user = ref.read(authProvider);
+    final displayName =
+        user?.userMetadata?['display_name'] as String? ?? '';
+    final initial =
+        displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle bar
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0DADA),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+
+                // Avatar
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: const BoxDecoration(
+                    gradient: brandGradient,
+                    shape: BoxShape.circle,
+                  ),
+                  child: displayName.isNotEmpty
+                      ? Center(
+                          child: Text(
+                            initial,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 26,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        )
+                      : const Icon(Icons.person,
+                          color: Colors.white, size: 30),
+                ),
+                const SizedBox(height: 12),
+
+                // Nome de exibição
+                if (displayName.isNotEmpty)
+                  Text(
+                    displayName,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: neutralDark,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                if (displayName.isNotEmpty) const SizedBox(height: 4),
+
+                // Email
+                Text(
+                  user?.email ?? '',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: textMedium,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Separador
+                const Divider(color: Color(0xFFF0EBE5), thickness: 1),
+                const SizedBox(height: 16),
+
+                // Botão Configurações
+                GestureDetector(
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Em breve'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: const Color(0xFFE8E0D8), width: 1.5),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.settings_outlined,
+                            size: 18, color: neutralMedium),
+                        SizedBox(width: 8),
+                        Text(
+                          'Configurações',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: neutralMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Botão Sair
+                GestureDetector(
+                  onTap: () async {
+                    Navigator.of(sheetContext).pop();
+                    await Supabase.instance.client.auth.signOut();
+                    ref.read(isUserActivatedProvider.notifier).state = false;
+                    if (context.mounted) context.go('/');
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF0EE),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: const Color(0xFFFFCCBB), width: 1),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text(
+                      'Sair',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: brandOrangeDark,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authProvider);
+    return GestureDetector(
+      onTap: () {
+        if (user == null) {
+          context.go('/login');
+        } else {
+          _showProfileSheet(context, ref);
+        }
+      },
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: user != null ? brandOrange : Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: user != null ? brandOrange : const Color(0xFFE8E0D8),
+            width: 1.5,
+          ),
+        ),
+        child: Icon(
+          Icons.person_outline,
+          size: 20,
+          color: user != null ? Colors.white : textMedium,
         ),
       ),
     );

@@ -42,9 +42,11 @@ app.*.map.json
 .externalNativeBuild
 .cxx
 
-# API keys — nunca subir no GitHub
+# API keys e docs sensíveis — nunca subir no GitHub
 lib/core/constants.dart
 backend/.env
+PROJETO_COZINHEI.md
+SETUP_TOOLS.md
 
 # Claude / Superpowers — não faz parte do app
 .claude/

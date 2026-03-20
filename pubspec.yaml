@@ -50,6 +50,9 @@ dependencies:
   # Supabase
   supabase_flutter: ^2.5.0
 
+  # Monitoramento de erros
+  sentry_flutter: ^8.11.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

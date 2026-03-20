@@ -2,6 +2,7 @@ import 'package:get_it/get_it.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/sentry_dio_interceptor.dart';
 import '../data/api/groq_service.dart';
 import '../data/api/unsplash_service.dart';
 import '../data/database/app_database.dart';
@@ -22,6 +23,7 @@ Future<void> setupDependencies() async {
   getIt.registerSingleton<AppDatabase>(AppDatabase());
 
   final dio = Dio();
+  dio.interceptors.add(SentryDioInterceptor());
   getIt.registerSingleton<Dio>(dio);
 
   getIt.registerSingleton<SupabaseClient>(Supabase.instance.client);

@@ -17,11 +17,22 @@ class _SavedRecipesScreenState extends ConsumerState<SavedRecipesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(authProvider);
     final savedAsync = ref.watch(savedRecipesProvider);
     final favoritesAsync = ref.watch(favoriteRecipesProvider);
     final actions = ref.read(savedRecipesActionsProvider.notifier);
 
     final asyncData = _showFavoritesOnly ? favoritesAsync : savedAsync;
+
+    if (user == null) {
+      return Scaffold(
+        backgroundColor: brandOrangeLight,
+        body: _LoginCta(
+          message: 'Faça login para salvar e acessar suas receitas favoritas',
+          redirectTo: '/saved',
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: brandOrangeLight,
@@ -135,6 +146,60 @@ class _FilterChip extends StatelessWidget {
             color: selected ? Colors.white : Colors.black87,
             fontWeight: FontWeight.w500,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LoginCta extends ConsumerWidget {
+  final String message;
+  final String redirectTo;
+
+  const _LoginCta({required this.message, required this.redirectTo});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('🔒', style: TextStyle(fontSize: 48)),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 15,
+                color: textMedium,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: () {
+                ref.read(isUserActivatedProvider.notifier).state = true;
+                context.go('/login?redirect=${Uri.encodeComponent(redirectTo)}');
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                decoration: BoxDecoration(
+                  gradient: brandGradient,
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                child: const Text(
+                  'Entrar na conta',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
