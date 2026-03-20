@@ -23,6 +23,12 @@ class HouseRepository {
 
   String? get currentUserId => _client.auth.currentUser?.id;
 
+  bool get isCurrentUserAnonymous {
+    final user = _client.auth.currentUser;
+    if (user == null) return true;
+    return user.isAnonymous;
+  }
+
   // ── Casa ─────────────────────────────────────────────────────────────────────
 
   Future<String> createHouse(String name, String displayName) async {
@@ -84,6 +90,22 @@ class HouseRepository {
   Future<String?> getSavedHouseId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_houseIdKey);
+  }
+
+  /// Busca a casa do usuário atual direto no Supabase (via house_members).
+  Future<String?> getHouseIdFromSupabase() async {
+    final userId = currentUserId;
+    if (userId == null) return null;
+    try {
+      final result = await _client
+          .from('house_members')
+          .select('house_id')
+          .eq('user_id', userId)
+          .maybeSingle();
+      return result?['house_id'] as String?;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _saveHouseId(String houseId) async {

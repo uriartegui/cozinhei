@@ -26,6 +26,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
 
+  String? _emailError;
+  String? _displayNameError;
+  String? _phoneError;
+  String? _passwordError;
+  String? _confirmPasswordError;
+
+  void _clearErrors() {
+    _emailError = null;
+    _displayNameError = null;
+    _phoneError = null;
+    _passwordError = null;
+    _confirmPasswordError = null;
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -37,50 +51,94 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    setState(() => _clearErrors());
+
     final email = _emailController.text.trim();
     final password = _passwordController.text;
+    bool hasError = false;
 
-    if (email.isEmpty || password.isEmpty) {
-      _showError('Preencha todos os campos.');
-      return;
+    if (email.isEmpty) {
+      setState(() => _emailError = 'Informe o email.');
+      hasError = true;
+    }
+    if (password.isEmpty) {
+      setState(() => _passwordError = 'Informe a senha.');
+      hasError = true;
     }
 
     if (_isSignUp) {
       if (_displayNameController.text.trim().isEmpty) {
-        _showError('Informe seu nome de exibição.');
-        return;
+        setState(() => _displayNameError = 'Informe seu nome de exibição.');
+        hasError = true;
       }
       if (_phoneController.text.trim().isEmpty) {
-        _showError('Informe seu telefone.');
-        return;
+        setState(() => _phoneError = 'Informe seu telefone.');
+        hasError = true;
+      } else {
+        final digits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+        if (digits.length < 10 || digits.length > 11) {
+          setState(() => _phoneError = 'Telefone inválido. Informe DDD + 8 ou 9 dígitos.');
+          hasError = true;
+        }
       }
-      if (_passwordController.text != _confirmPasswordController.text) {
-        _showError('As senhas não coincidem.');
-        return;
+      if (_confirmPasswordController.text.isEmpty) {
+        setState(() => _confirmPasswordError = 'Confirme sua senha.');
+        hasError = true;
+      } else if (password != _confirmPasswordController.text) {
+        setState(() => _confirmPasswordError = 'As senhas não coincidem.');
+        hasError = true;
       }
     }
+
+    if (hasError) return;
 
     setState(() => _isLoading = true);
 
     try {
       if (_isSignUp) {
-        await Supabase.instance.client.auth.signUp(
+        final displayName = _displayNameController.text.trim();
+        final phone = _phoneController.text.trim();
+
+        // Valida tudo em paralelo
+        final results = await Future.wait([
+          Supabase.instance.client.from('profiles').select('id').eq('display_name', displayName).maybeSingle(),
+          Supabase.instance.client.from('profiles').select('id').eq('phone', phone).maybeSingle(),
+          Supabase.instance.client.from('profiles').select('id').eq('email', email).maybeSingle(),
+        ]);
+
+        bool hasConflict = false;
+        if (results[0] != null) {
+          setState(() => _displayNameError = 'Este nome já está em uso.');
+          hasConflict = true;
+        }
+        if (results[1] != null) {
+          setState(() => _phoneError = 'Este telefone já está cadastrado.');
+          hasConflict = true;
+        }
+        if (results[2] != null) {
+          setState(() => _emailError = 'Este email já está cadastrado.');
+          hasConflict = true;
+        }
+        if (hasConflict) return;
+
+        final response = await Supabase.instance.client.auth.signUp(
           email: email,
           password: password,
-          data: {
-            'display_name': _displayNameController.text.trim(),
-            'phone': _phoneController.text.trim(),
-          },
+          data: {'display_name': displayName, 'phone': phone},
         );
+
+        if (response.user != null) {
+          await Supabase.instance.client.from('profiles').insert({
+            'id': response.user!.id,
+            'display_name': displayName,
+            'phone': phone,
+            'email': email,
+          });
+        }
+
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Verifique seu email para confirmar o cadastro.'),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
           ref.read(isUserActivatedProvider.notifier).state = true;
+          _invalidateProviders();
           context.go(Uri.decodeComponent(widget.redirectTo ?? '/'));
         }
       } else {
@@ -90,22 +148,73 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
         if (mounted) {
           ref.read(isUserActivatedProvider.notifier).state = true;
+          _invalidateProviders();
           context.go(Uri.decodeComponent(widget.redirectTo ?? '/'));
         }
       }
     } on AuthException catch (e) {
-      if (mounted) _showError(e.message);
+      final msg = _translateError(e.message);
+      if (mounted) {
+        setState(() {
+          if (msg.contains('email') || msg.contains('Email')) {
+            _emailError = msg;
+          } else if (msg.contains('senha') || msg.contains('Senha')) {
+            _passwordError = msg;
+          } else {
+            _emailError = msg;
+          }
+        });
+      }
     } catch (e) {
-      if (mounted) _showError('Erro inesperado. Tente novamente.');
+      if (mounted) setState(() => _emailError = 'Erro inesperado. Tente novamente.');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  String _translateError(String message) {
+    final m = message.toLowerCase();
+    if (m.contains('user already registered') || m.contains('already registered')) {
+      return 'Este email já está cadastrado.';
+    }
+    if (m.contains('invalid login credentials') || m.contains('invalid credentials')) {
+      return 'Email ou senha incorretos.';
+    }
+    if (m.contains('email not confirmed')) {
+      return 'Email não confirmado. Verifique sua caixa de entrada.';
+    }
+    if (m.contains('password should be at least')) {
+      return 'A senha deve ter pelo menos 6 caracteres.';
+    }
+    if (m.contains('unable to validate email address')) {
+      return 'Email inválido.';
+    }
+    if (m.contains('signup is disabled')) {
+      return 'Cadastro desativado no momento.';
+    }
+    if (m.contains('email rate limit exceeded') || m.contains('rate limit')) {
+      return 'Muitas tentativas. Tente novamente em breve.';
+    }
+    if (m.contains('duplicate key') && m.contains('display_name')) {
+      return 'Este nome de exibição já está em uso.';
+    }
+    if (m.contains('duplicate key') && m.contains('phone')) {
+      return 'Este telefone já está cadastrado.';
+    }
+    return message;
+  }
+
+  void _invalidateProviders() {
+    ref.invalidate(houseProvider);
+    ref.invalidate(fridgeProvider);
+    ref.invalidate(savedRecipesProvider);
+    ref.invalidate(favoriteRecipesProvider);
+  }
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(_translateError(message)),
         backgroundColor: Colors.redAccent,
         behavior: SnackBarBehavior.floating,
       ),
@@ -114,99 +223,77 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final top = MediaQuery.of(context).padding.top;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final top = MediaQuery.of(context).padding.top;
 
     return Scaffold(
-      backgroundColor: brandOrangeDark,
+      backgroundColor: neutralBackground,
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // ── Fundo gradiente ──────────────────────────────────────────
-          Container(
-            height: size.height,
-            decoration: const BoxDecoration(gradient: brandGradient),
-          ),
-
           // ── Hero section ─────────────────────────────────────────────
           Positioned(
-            top: top + 28,
+            top: top + 20,
             left: 0,
             right: 0,
             child: Column(
               children: [
-                // Ícone
+                // Ícone quadrado arredondado
                 Container(
-                  width: 68,
-                  height: 68,
+                  width: 56,
+                  height: 56,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.35),
-                      width: 1.5,
-                    ),
+                    color: brandPrimary,
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Center(
-                    child: Text('🍳', style: TextStyle(fontSize: 32)),
+                    child: Icon(
+                      Icons.restaurant_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
                 const Text(
-                  'Cozinhei',
+                  'Bem-vindo ao\nCozinhei',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 34,
+                    color: neutralDark,
+                    fontSize: 24,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: -1.2,
+                    letterSpacing: -0.8,
+                    height: 1.15,
                   ),
                 ),
                 const SizedBox(height: 4),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 200),
-                  child: Text(
-                    _isSignUp
-                        ? 'Crie sua conta gratuita'
-                        : 'Bem-vindo de volta!',
-                    key: ValueKey(_isSignUp),
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.80),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      letterSpacing: -0.2,
-                    ),
+                const Text(
+                  'Sua jornada gastronômica começa aqui',
+                  style: TextStyle(
+                    color: neutralMedium,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
               ],
             ),
           ),
 
-          // ── Card branco deslizante ────────────────────────────────────
+          // ── Card (sem borda arredondada, fundo já é branco) ───────────
           Positioned(
             bottom: 0,
             left: 0,
             right: 0,
-            top: size.height * 0.30,
+            top: MediaQuery.of(context).size.height * 0.22,
             child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Color(0x22000000),
-                    blurRadius: 24,
-                    offset: Offset(0, -4),
-                  ),
-                ],
-              ),
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(24, 32, 24, 24 + bottomInset),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Toggle Entrar / Criar conta
-                    Container(
+              decoration: const BoxDecoration(color: neutralBackground),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── Tabs fixas ──────────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+                    child: Container(
                       height: 44,
                       decoration: BoxDecoration(
                         color: const Color(0xFFF5F2EE),
@@ -217,181 +304,190 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           _Tab(
                             label: 'Entrar',
                             active: !_isSignUp,
-                            onTap: () => setState(() => _isSignUp = false),
+                            onTap: () => setState(() {
+                              _isSignUp = false;
+                              _clearErrors();
+                              _emailController.clear();
+                              _passwordController.clear();
+                              _displayNameController.clear();
+                              _phoneController.clear();
+                              _confirmPasswordController.clear();
+                            }),
                           ),
                           _Tab(
                             label: 'Criar conta',
                             active: _isSignUp,
-                            onTap: () => setState(() => _isSignUp = true),
+                            onTap: () => setState(() {
+                              _isSignUp = true;
+                              _clearErrors();
+                              _emailController.clear();
+                              _passwordController.clear();
+                            }),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 28),
+                  ),
 
-                    // Email
-                    const _Label(text: 'Email'),
-                    const SizedBox(height: 6),
-                    _Input(
-                      controller: _emailController,
-                      hint: 'nome@exemplo.com',
-                      keyboardType: TextInputType.emailAddress,
-                      autofillHints: const [AutofillHints.email],
-                      prefixIcon: Icons.mail_outline_rounded,
-                    ),
-                    const SizedBox(height: 16),
+                  // ── Campos scrolláveis ──────────────────────────────────
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Email
+                          const _Label(text: 'Email'),
+                          const SizedBox(height: 6),
+                          _Input(
+                            controller: _emailController,
+                            hint: '',
+                            keyboardType: TextInputType.emailAddress,
+                            autofillHints: const [AutofillHints.email],
+                            hasError: _emailError != null,
+                          ),
+                          if (_emailError != null) _FieldError(_emailError!),
+                          const SizedBox(height: 12),
 
-                    // Campos extras de cadastro (Nome e Telefone)
-                    AnimatedSize(
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeInOut,
-                      child: _isSignUp
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                const _Label(text: 'Nome de exibição'),
-                                const SizedBox(height: 6),
-                                _Input(
-                                  controller: _displayNameController,
-                                  hint: 'Como quer ser chamado?',
-                                  prefixIcon: Icons.person_outline_rounded,
-                                ),
-                                const SizedBox(height: 16),
-                                const _Label(text: 'Telefone'),
-                                const SizedBox(height: 6),
-                                _Input(
-                                  controller: _phoneController,
-                                  hint: '(11) 99999-9999',
-                                  keyboardType: TextInputType.phone,
-                                  prefixIcon: Icons.phone_outlined,
-                                ),
-                                const SizedBox(height: 16),
-                              ],
-                            )
-                          : const SizedBox.shrink(),
-                    ),
+                          // Campos extras de cadastro
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeInOut,
+                            child: _isSignUp
+                                ? Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      const _Label(text: 'Nome de exibição'),
+                                      const SizedBox(height: 6),
+                                      _Input(
+                                        controller: _displayNameController,
+                                        hint: '',
+                                        hasError: _displayNameError != null,
+                                      ),
+                                      if (_displayNameError != null) _FieldError(_displayNameError!),
+                                      const SizedBox(height: 12),
+                                      const _Label(text: 'Telefone'),
+                                      const SizedBox(height: 6),
+                                      _Input(
+                                        controller: _phoneController,
+                                        hint: '',
+                                        keyboardType: TextInputType.phone,
+                                        hasError: _phoneError != null,
+                                      ),
+                                      if (_phoneError != null) _FieldError(_phoneError!),
+                                      const SizedBox(height: 12),
+                                    ],
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
 
-                    // Senha
-                    const _Label(text: 'Senha'),
-                    const SizedBox(height: 6),
-                    _Input(
-                      controller: _passwordController,
-                      hint: '••••••••',
-                      obscureText: _obscurePassword,
-                      autofillHints: _isSignUp
-                          ? const [AutofillHints.newPassword]
-                          : const [AutofillHints.password],
-                      prefixIcon: Icons.lock_outline_rounded,
-                      suffix: GestureDetector(
-                        onTap: () =>
-                            setState(() => _obscurePassword = !_obscurePassword),
-                        child: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          size: 20,
-                          color: neutralMedium,
-                        ),
+                          // Senha
+                          const _Label(text: 'Senha'),
+                          const SizedBox(height: 6),
+                          _Input(
+                            controller: _passwordController,
+                            hint: '',
+                            obscureText: _obscurePassword,
+                            hasError: _passwordError != null,
+                            autofillHints: _isSignUp
+                                ? const [AutofillHints.newPassword]
+                                : const [AutofillHints.password],
+                            suffix: GestureDetector(
+                              onTap: () => setState(
+                                  () => _obscurePassword = !_obscurePassword),
+                              child: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                                size: 20,
+                                color: neutralMedium,
+                              ),
+                            ),
+                          ),
+                          if (_passwordError != null) _FieldError(_passwordError!),
+                          const SizedBox(height: 12),
+
+                          // Confirmar senha (somente cadastro)
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeInOut,
+                            child: _isSignUp
+                                ? Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      const _Label(text: 'Confirmar senha'),
+                                      const SizedBox(height: 6),
+                                      _Input(
+                                        controller: _confirmPasswordController,
+                                        hint: '',
+                                        obscureText: _obscureConfirmPassword,
+                                        hasError: _confirmPasswordError != null,
+                                        autofillHints: const [AutofillHints.newPassword],
+                                        suffix: GestureDetector(
+                                          onTap: () => setState(() =>
+                                              _obscureConfirmPassword =
+                                                  !_obscureConfirmPassword),
+                                          child: Icon(
+                                            _obscureConfirmPassword
+                                                ? Icons.visibility_outlined
+                                                : Icons.visibility_off_outlined,
+                                            size: 20,
+                                            color: neutralMedium,
+                                          ),
+                                        ),
+                                      ),
+                                      if (_confirmPasswordError != null)
+                                        _FieldError(_confirmPasswordError!),
+                                    ],
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                  ),
 
-                    // Confirmar senha (somente no cadastro)
-                    AnimatedSize(
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeInOut,
-                      child: _isSignUp
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                const _Label(text: 'Confirmar senha'),
-                                const SizedBox(height: 6),
-                                _Input(
-                                  controller: _confirmPasswordController,
-                                  hint: '••••••••',
-                                  obscureText: _obscureConfirmPassword,
-                                  autofillHints: const [
-                                    AutofillHints.newPassword
-                                  ],
-                                  prefixIcon: Icons.lock_outline_rounded,
-                                  suffix: GestureDetector(
-                                    onTap: () => setState(() =>
-                                        _obscureConfirmPassword =
-                                            !_obscureConfirmPassword),
-                                    child: Icon(
-                                      _obscureConfirmPassword
-                                          ? Icons.visibility_outlined
-                                          : Icons.visibility_off_outlined,
-                                      size: 20,
-                                      color: neutralMedium,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 28),
-                              ],
-                            )
-                          : const SizedBox(height: 12),
-                    ),
-
-                    // Botão principal
-                    _SubmitButton(
-                      label: _isSignUp ? 'Criar conta' : 'Entrar',
-                      isLoading: _isLoading,
-                      onPressed: _submit,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Divisor
-                    Row(
+                  // ── Botão fixo no rodapé ────────────────────────────────
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(24, 8, 24, 16 + bottomInset),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Expanded(
-                          child: Divider(color: Color(0xFFE8E0D8), thickness: 1),
+                        _SubmitButton(
+                          label: _isSignUp ? 'Criar conta' : 'Entrar',
+                          isLoading: _isLoading,
+                          onPressed: _submit,
                         ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Text(
-                            'ou',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: neutralMedium,
-                              fontWeight: FontWeight.w500,
+                        const SizedBox(height: 16),
+                        GestureDetector(
+                          onTap: () => context.go('/'),
+                          child: Center(
+                            child: Text(
+                              'Continuar sem conta →',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: neutralMedium,
+                              ),
                             ),
                           ),
                         ),
-                        const Expanded(
-                          child: Divider(color: Color(0xFFE8E0D8), thickness: 1),
+                        const SizedBox(height: 12),
+                        Center(
+                          child: Text(
+                            'Cozinhei',
+                            style: TextStyle(
+                              fontSize: 36,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFFF5F2EE),
+                              letterSpacing: -1.5,
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-
-                    // Continuar sem conta
-                    GestureDetector(
-                      onTap: () => context.go('/'),
-                      child: Container(
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: const Color(0xFFE8E0D8),
-                            width: 1.5,
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          'Continuar sem conta',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: neutralMedium,
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -465,20 +561,40 @@ class _Label extends StatelessWidget {
   }
 }
 
+class _FieldError extends StatelessWidget {
+  final String message;
+  const _FieldError(this.message);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, left: 4),
+      child: Text(
+        message,
+        style: const TextStyle(
+          fontSize: 12,
+          color: Colors.redAccent,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
 class _Input extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final bool obscureText;
+  final bool hasError;
   final TextInputType? keyboardType;
   final Iterable<String>? autofillHints;
-  final IconData prefixIcon;
   final Widget? suffix;
 
   const _Input({
     required this.controller,
     required this.hint,
-    required this.prefixIcon,
     this.obscureText = false,
+    this.hasError = false,
     this.keyboardType,
     this.autofillHints,
     this.suffix,
@@ -490,7 +606,10 @@ class _Input extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFFAF8F5),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFECE8E3), width: 1.5),
+        border: Border.all(
+          color: hasError ? Colors.redAccent : const Color(0xFFECE8E3),
+          width: 1.5,
+        ),
       ),
       child: TextField(
         controller: controller,
@@ -511,12 +630,7 @@ class _Input extends StatelessWidget {
           ),
           border: InputBorder.none,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          prefixIcon: Padding(
-            padding: const EdgeInsets.only(left: 14, right: 10),
-            child: Icon(prefixIcon, size: 20, color: neutralMedium),
-          ),
-          prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           suffixIcon: suffix != null
               ? Padding(
                   padding: const EdgeInsets.only(right: 14),
@@ -585,4 +699,84 @@ class _SubmitButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SocialButton extends StatelessWidget {
+  final String label;
+  final Widget icon;
+
+  const _SocialButton({required this.label, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 46,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE8E0D8), width: 1.5),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          icon,
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: neutralDark,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GoogleIcon extends StatelessWidget {
+  const _GoogleIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      width: 18,
+      height: 18,
+      child: CustomPaint(painter: _GooglePainter()),
+    );
+  }
+}
+
+class _GooglePainter extends CustomPainter {
+  const _GooglePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..style = PaintingStyle.fill;
+    final center = Offset(size.width / 2, size.height / 2);
+    final r = size.width / 2;
+
+    paint.color = const Color(0xFFEA4335);
+    canvas.drawArc(Rect.fromCircle(center: center, radius: r),
+        -1.57, 3.14, true, paint);
+
+    paint.color = const Color(0xFF34A853);
+    canvas.drawArc(Rect.fromCircle(center: center, radius: r),
+        1.57, 1.57, true, paint);
+
+    paint.color = const Color(0xFFFBBC05);
+    canvas.drawArc(Rect.fromCircle(center: center, radius: r),
+        3.14, 0.785, true, paint);
+
+    paint.color = const Color(0xFF4285F4);
+    canvas.drawArc(Rect.fromCircle(center: center, radius: r),
+        3.925, 0.785, true, paint);
+
+    paint.color = Colors.white;
+    canvas.drawCircle(center, r * 0.6, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -17,22 +17,11 @@ class _SavedRecipesScreenState extends ConsumerState<SavedRecipesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authProvider);
     final savedAsync = ref.watch(savedRecipesProvider);
     final favoritesAsync = ref.watch(favoriteRecipesProvider);
     final actions = ref.read(savedRecipesActionsProvider.notifier);
 
     final asyncData = _showFavoritesOnly ? favoritesAsync : savedAsync;
-
-    if (user == null) {
-      return Scaffold(
-        backgroundColor: brandOrangeLight,
-        body: _LoginCta(
-          message: 'Faça login para salvar e acessar suas receitas favoritas',
-          redirectTo: '/saved',
-        ),
-      );
-    }
 
     return Scaffold(
       backgroundColor: brandOrangeLight,

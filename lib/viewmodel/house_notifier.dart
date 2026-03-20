@@ -47,14 +47,22 @@ class HouseNotifier extends StateNotifier<HouseState> {
   Future<void> _init() async {
     try {
       await _repo.signInAnonymously();
-      final savedId = await _repo.getSavedHouseId();
-      if (savedId != null) {
-        final info = await _repo.getHouseInfo(savedId);
+
+      // Prioriza a casa do usuário atual no Supabase (correto após troca de conta)
+      String? houseId = await _repo.getHouseIdFromSupabase();
+
+      // Fallback: SharedPreferences apenas para usuários anônimos
+      if (houseId == null && _repo.isCurrentUserAnonymous) {
+        houseId = await _repo.getSavedHouseId();
+      }
+
+      if (houseId != null) {
+        final info = await _repo.getHouseInfo(houseId);
         if (info != null) {
           final displayName = await _repo.getSavedDisplayName();
           state = HouseState(
             status: HouseStatus.hasHouse,
-            houseId: savedId,
+            houseId: houseId,
             houseName: info['name'] as String?,
             inviteCode: info['invite_code'] as String?,
             displayName: displayName,

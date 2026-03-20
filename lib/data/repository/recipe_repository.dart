@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../api/groq_service.dart';
 import '../api/unsplash_service.dart';
 import '../api/model/chat_request.dart';
@@ -12,13 +13,17 @@ class RecipeRepository {
   final GroqService _groqService;
   final UnsplashService _unsplashService;
   final AppDatabase _db;
+  final SupabaseClient _supabase;
   final _uuid = const Uuid();
 
   RecipeRepository(
       this._groqService,
       this._unsplashService,
       this._db,
+      this._supabase,
       );
+
+  String? get _userId => _supabase.auth.currentUser?.id;
 
   // ── Fridge Suggestions ────────────────────────────────────────────────────
 
@@ -155,35 +160,67 @@ Responda APENAS com um JSON array válido:
   // ── Database ──────────────────────────────────────────────────────────────
 
   Future<void> saveRecipe(Recipe recipe) async {
-    await _db.insertRecipe(RecipesCompanion(
-      id: Value(recipe.id),
-      name: Value(recipe.name),
-      description: Value(recipe.description),
-      ingredients: Value(jsonEncode(recipe.ingredients)),
-      steps: Value(jsonEncode(recipe.steps)),
-      cookingTime: Value(recipe.cookingTime),
-      servings: Value(recipe.servings),
-      isFavorite: Value(recipe.isFavorite),
-      createdAt: Value(recipe.createdAt),
-      imageUrl: Value(recipe.imageUrl),
-      source: Value(recipe.source),
-    ));
+    final uid = _userId;
+    if (uid == null) return;
+    await _supabase.from('saved_recipes').upsert({
+      'id': recipe.id,
+      'user_id': uid,
+      'name': recipe.name,
+      'description': recipe.description,
+      'ingredients': recipe.ingredients,
+      'steps': recipe.steps,
+      'cooking_time': recipe.cookingTime,
+      'servings': recipe.servings,
+      'is_favorite': recipe.isFavorite,
+      'created_at': recipe.createdAt,
+      'image_url': recipe.imageUrl,
+      'source': recipe.source,
+    });
   }
 
-  Stream<List<Recipe>> getSavedRecipes() =>
-      _db.getAllRecipes().map((list) => list.map(_entityToDomain).toList());
+  Stream<List<Recipe>> getSavedRecipes() {
+    final uid = _userId;
+    if (uid == null) return Stream.value([]);
+    return _supabase
+        .from('saved_recipes')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', uid)
+        .order('created_at', ascending: false)
+        .map((data) => data.map(_rowToDomain).toList());
+  }
 
-  Stream<List<Recipe>> getFavoriteRecipes() =>
-      _db.getFavorites().map((list) => list.map(_entityToDomain).toList());
+  Stream<List<Recipe>> getFavoriteRecipes() {
+    final uid = _userId;
+    if (uid == null) return Stream.value([]);
+    return _supabase
+        .from('saved_recipes')
+        .stream(primaryKey: ['id'])
+        .eq('user_id', uid)
+        .order('created_at', ascending: false)
+        .map((data) => data
+            .where((r) => r['is_favorite'] == true)
+            .map(_rowToDomain)
+            .toList());
+  }
 
-  Future<void> toggleFavorite(String id, bool isFavorite) =>
-      _db.toggleFavorite(id, isFavorite);
+  Future<void> toggleFavorite(String id, bool isFavorite) async {
+    await _supabase
+        .from('saved_recipes')
+        .update({'is_favorite': !isFavorite})
+        .eq('id', id);
+  }
 
-  Future<void> deleteRecipe(String id) => _db.deleteRecipe(id);
+  Future<void> deleteRecipe(String id) async {
+    await _supabase.from('saved_recipes').delete().eq('id', id);
+  }
 
   Future<Recipe?> getById(String id) async {
-    final entity = await _db.getById(id);
-    return entity != null ? _entityToDomain(entity) : null;
+    final row = await _supabase
+        .from('saved_recipes')
+        .select()
+        .eq('id', id)
+        .maybeSingle();
+    return row != null ? _rowToDomain(row) : null;
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -212,6 +249,20 @@ Responda APENAS com um JSON array válido:
     servings: dto.servings,
     imageUrl: dto.imageUrl,
     source: null,
+  );
+
+  Recipe _rowToDomain(Map<String, dynamic> row) => Recipe(
+    id: row['id'] as String,
+    name: row['name'] as String,
+    description: row['description'] as String? ?? '',
+    ingredients: List<String>.from(row['ingredients'] as List),
+    steps: List<String>.from(row['steps'] as List),
+    cookingTime: row['cooking_time'] as String? ?? '',
+    servings: row['servings'] as String? ?? '',
+    isFavorite: row['is_favorite'] as bool? ?? false,
+    createdAt: row['created_at'] as int? ?? 0,
+    imageUrl: row['image_url'] as String?,
+    source: row['source'] as String?,
   );
 
   Recipe _entityToDomain(RecipeEntity entity) => Recipe(

@@ -16,6 +16,7 @@ class Recipes extends Table {
   IntColumn get createdAt => integer()();
   TextColumn get imageUrl => text().nullable()();
   TextColumn get source => text().nullable()();
+  TextColumn get userId => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -46,7 +47,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(driftDatabase(name: 'cozinhei_db'));
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -62,6 +63,9 @@ class AppDatabase extends _$AppDatabase {
       if (from < 4) {
         await migrator.addColumn(userRecipes, userRecipes.subcategory);
       }
+      if (from < 5) {
+        await migrator.addColumn(recipes, recipes.userId);
+      }
     },
   );
 
@@ -70,11 +74,17 @@ class AppDatabase extends _$AppDatabase {
   Future<void> insertRecipe(RecipesCompanion recipe) =>
       into(recipes).insertOnConflictUpdate(recipe);
 
-  Stream<List<RecipeEntity>> getAllRecipes() =>
-      (select(recipes)..orderBy([(r) => OrderingTerm.desc(r.createdAt)])).watch();
+  Stream<List<RecipeEntity>> getAllRecipes({String? userId}) =>
+      (select(recipes)
+        ..where((r) => userId != null ? r.userId.equals(userId) : const Constant(true))
+        ..orderBy([(r) => OrderingTerm.desc(r.createdAt)])).watch();
 
-  Stream<List<RecipeEntity>> getFavorites() =>
-      (select(recipes)..where((r) => r.isFavorite.equals(true))).watch();
+  Stream<List<RecipeEntity>> getFavorites({String? userId}) =>
+      (select(recipes)
+        ..where((r) {
+          final favFilter = r.isFavorite.equals(true);
+          return userId != null ? favFilter & r.userId.equals(userId) : favFilter;
+        })).watch();
 
   Future<void> toggleFavorite(String id, bool isFavorite) =>
       (update(recipes)..where((r) => r.id.equals(id)))

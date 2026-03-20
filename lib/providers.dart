@@ -63,12 +63,14 @@ StateNotifierProvider<SavedRecipesNotifier, void>((ref) {
   return SavedRecipesNotifier(ref.read(recipeRepositoryProvider));
 });
 
-// Database streams
+// Database streams — reagem à troca de usuário
 final savedRecipesProvider = StreamProvider<List<Recipe>>((ref) {
+  ref.watch(authProvider); // reconstrói ao trocar de usuário
   return ref.read(recipeRepositoryProvider).getSavedRecipes();
 });
 
 final favoriteRecipesProvider = StreamProvider<List<Recipe>>((ref) {
+  ref.watch(authProvider); // reconstrói ao trocar de usuário
   return ref.read(recipeRepositoryProvider).getFavoriteRecipes();
 });
 

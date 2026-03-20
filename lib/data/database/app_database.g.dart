@@ -126,6 +126,15 @@ class $RecipesTable extends Recipes
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+    'user_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -139,6 +148,7 @@ class $RecipesTable extends Recipes
     createdAt,
     imageUrl,
     source,
+    userId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -240,6 +250,12 @@ class $RecipesTable extends Recipes
         source.isAcceptableOrUnknown(data['source']!, _sourceMeta),
       );
     }
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    }
     return context;
   }
 
@@ -293,6 +309,10 @@ class $RecipesTable extends Recipes
         DriftSqlType.string,
         data['${effectivePrefix}source'],
       ),
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_id'],
+      ),
     );
   }
 
@@ -314,6 +334,7 @@ class RecipeEntity extends DataClass implements Insertable<RecipeEntity> {
   final int createdAt;
   final String? imageUrl;
   final String? source;
+  final String? userId;
   const RecipeEntity({
     required this.id,
     required this.name,
@@ -326,6 +347,7 @@ class RecipeEntity extends DataClass implements Insertable<RecipeEntity> {
     required this.createdAt,
     this.imageUrl,
     this.source,
+    this.userId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -344,6 +366,9 @@ class RecipeEntity extends DataClass implements Insertable<RecipeEntity> {
     }
     if (!nullToAbsent || source != null) {
       map['source'] = Variable<String>(source);
+    }
+    if (!nullToAbsent || userId != null) {
+      map['user_id'] = Variable<String>(userId);
     }
     return map;
   }
@@ -365,6 +390,9 @@ class RecipeEntity extends DataClass implements Insertable<RecipeEntity> {
       source: source == null && nullToAbsent
           ? const Value.absent()
           : Value(source),
+      userId: userId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(userId),
     );
   }
 
@@ -385,6 +413,7 @@ class RecipeEntity extends DataClass implements Insertable<RecipeEntity> {
       createdAt: serializer.fromJson<int>(json['createdAt']),
       imageUrl: serializer.fromJson<String?>(json['imageUrl']),
       source: serializer.fromJson<String?>(json['source']),
+      userId: serializer.fromJson<String?>(json['userId']),
     );
   }
   @override
@@ -402,6 +431,7 @@ class RecipeEntity extends DataClass implements Insertable<RecipeEntity> {
       'createdAt': serializer.toJson<int>(createdAt),
       'imageUrl': serializer.toJson<String?>(imageUrl),
       'source': serializer.toJson<String?>(source),
+      'userId': serializer.toJson<String?>(userId),
     };
   }
 
@@ -417,6 +447,7 @@ class RecipeEntity extends DataClass implements Insertable<RecipeEntity> {
     int? createdAt,
     Value<String?> imageUrl = const Value.absent(),
     Value<String?> source = const Value.absent(),
+    Value<String?> userId = const Value.absent(),
   }) => RecipeEntity(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -429,6 +460,7 @@ class RecipeEntity extends DataClass implements Insertable<RecipeEntity> {
     createdAt: createdAt ?? this.createdAt,
     imageUrl: imageUrl.present ? imageUrl.value : this.imageUrl,
     source: source.present ? source.value : this.source,
+    userId: userId.present ? userId.value : this.userId,
   );
   RecipeEntity copyWithCompanion(RecipesCompanion data) {
     return RecipeEntity(
@@ -451,6 +483,7 @@ class RecipeEntity extends DataClass implements Insertable<RecipeEntity> {
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       imageUrl: data.imageUrl.present ? data.imageUrl.value : this.imageUrl,
       source: data.source.present ? data.source.value : this.source,
+      userId: data.userId.present ? data.userId.value : this.userId,
     );
   }
 
@@ -467,7 +500,8 @@ class RecipeEntity extends DataClass implements Insertable<RecipeEntity> {
           ..write('isFavorite: $isFavorite, ')
           ..write('createdAt: $createdAt, ')
           ..write('imageUrl: $imageUrl, ')
-          ..write('source: $source')
+          ..write('source: $source, ')
+          ..write('userId: $userId')
           ..write(')'))
         .toString();
   }
@@ -485,6 +519,7 @@ class RecipeEntity extends DataClass implements Insertable<RecipeEntity> {
     createdAt,
     imageUrl,
     source,
+    userId,
   );
   @override
   bool operator ==(Object other) =>
@@ -500,7 +535,8 @@ class RecipeEntity extends DataClass implements Insertable<RecipeEntity> {
           other.isFavorite == this.isFavorite &&
           other.createdAt == this.createdAt &&
           other.imageUrl == this.imageUrl &&
-          other.source == this.source);
+          other.source == this.source &&
+          other.userId == this.userId);
 }
 
 class RecipesCompanion extends UpdateCompanion<RecipeEntity> {
@@ -515,6 +551,7 @@ class RecipesCompanion extends UpdateCompanion<RecipeEntity> {
   final Value<int> createdAt;
   final Value<String?> imageUrl;
   final Value<String?> source;
+  final Value<String?> userId;
   final Value<int> rowid;
   const RecipesCompanion({
     this.id = const Value.absent(),
@@ -528,6 +565,7 @@ class RecipesCompanion extends UpdateCompanion<RecipeEntity> {
     this.createdAt = const Value.absent(),
     this.imageUrl = const Value.absent(),
     this.source = const Value.absent(),
+    this.userId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   RecipesCompanion.insert({
@@ -542,6 +580,7 @@ class RecipesCompanion extends UpdateCompanion<RecipeEntity> {
     required int createdAt,
     this.imageUrl = const Value.absent(),
     this.source = const Value.absent(),
+    this.userId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -563,6 +602,7 @@ class RecipesCompanion extends UpdateCompanion<RecipeEntity> {
     Expression<int>? createdAt,
     Expression<String>? imageUrl,
     Expression<String>? source,
+    Expression<String>? userId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -577,6 +617,7 @@ class RecipesCompanion extends UpdateCompanion<RecipeEntity> {
       if (createdAt != null) 'created_at': createdAt,
       if (imageUrl != null) 'image_url': imageUrl,
       if (source != null) 'source': source,
+      if (userId != null) 'user_id': userId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -593,6 +634,7 @@ class RecipesCompanion extends UpdateCompanion<RecipeEntity> {
     Value<int>? createdAt,
     Value<String?>? imageUrl,
     Value<String?>? source,
+    Value<String?>? userId,
     Value<int>? rowid,
   }) {
     return RecipesCompanion(
@@ -607,6 +649,7 @@ class RecipesCompanion extends UpdateCompanion<RecipeEntity> {
       createdAt: createdAt ?? this.createdAt,
       imageUrl: imageUrl ?? this.imageUrl,
       source: source ?? this.source,
+      userId: userId ?? this.userId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -647,6 +690,9 @@ class RecipesCompanion extends UpdateCompanion<RecipeEntity> {
     if (source.present) {
       map['source'] = Variable<String>(source.value);
     }
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -667,6 +713,7 @@ class RecipesCompanion extends UpdateCompanion<RecipeEntity> {
           ..write('createdAt: $createdAt, ')
           ..write('imageUrl: $imageUrl, ')
           ..write('source: $source, ')
+          ..write('userId: $userId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1463,6 +1510,7 @@ typedef $$RecipesTableCreateCompanionBuilder =
       required int createdAt,
       Value<String?> imageUrl,
       Value<String?> source,
+      Value<String?> userId,
       Value<int> rowid,
     });
 typedef $$RecipesTableUpdateCompanionBuilder =
@@ -1478,6 +1526,7 @@ typedef $$RecipesTableUpdateCompanionBuilder =
       Value<int> createdAt,
       Value<String?> imageUrl,
       Value<String?> source,
+      Value<String?> userId,
       Value<int> rowid,
     });
 
@@ -1542,6 +1591,11 @@ class $$RecipesTableFilterComposer
 
   ColumnFilters<String> get source => $composableBuilder(
     column: $table.source,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get userId => $composableBuilder(
+    column: $table.userId,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -1609,6 +1663,11 @@ class $$RecipesTableOrderingComposer
     column: $table.source,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$RecipesTableAnnotationComposer
@@ -1660,6 +1719,9 @@ class $$RecipesTableAnnotationComposer
 
   GeneratedColumn<String> get source =>
       $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
 }
 
 class $$RecipesTableTableManager
@@ -1704,6 +1766,7 @@ class $$RecipesTableTableManager
                 Value<int> createdAt = const Value.absent(),
                 Value<String?> imageUrl = const Value.absent(),
                 Value<String?> source = const Value.absent(),
+                Value<String?> userId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RecipesCompanion(
                 id: id,
@@ -1717,6 +1780,7 @@ class $$RecipesTableTableManager
                 createdAt: createdAt,
                 imageUrl: imageUrl,
                 source: source,
+                userId: userId,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -1732,6 +1796,7 @@ class $$RecipesTableTableManager
                 required int createdAt,
                 Value<String?> imageUrl = const Value.absent(),
                 Value<String?> source = const Value.absent(),
+                Value<String?> userId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RecipesCompanion.insert(
                 id: id,
@@ -1745,6 +1810,7 @@ class $$RecipesTableTableManager
                 createdAt: createdAt,
                 imageUrl: imageUrl,
                 source: source,
+                userId: userId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

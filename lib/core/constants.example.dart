@@ -11,4 +11,6 @@ class AppConstants {
 
   static const String supabaseUrl = 'SEU_SUPABASE_URL_AQUI';
   static const String supabaseAnonKey = 'SUA_SUPABASE_ANON_KEY_AQUI';
+
+  static const String sentryDsn = 'SEU_SENTRY_DSN_AQUI';
 }

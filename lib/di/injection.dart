@@ -43,6 +43,7 @@ Future<void> setupDependencies() async {
       getIt<GroqService>(),
       getIt<UnsplashService>(),
       getIt<AppDatabase>(),
+      getIt<SupabaseClient>(),
     ),
   );
   getIt.registerSingleton<UserRecipeRepository>(
