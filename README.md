@@ -29,7 +29,7 @@ Cozinhei resolve isso gerando receitas sob medida, com ingredientes que você re
 ## 🎯 Funcionalidades
 
 - 🧠 **Geração de receitas com IA** — envia ingredientes, categoria e filtros; a IA gera receitas completas e detalhadas.
-- 🧊 **Geladeira inteligente** — cadastre os ingredientes que você tem em casa e receba sugestões automáticas toda vez que abrir o app.
+- 🧊 **Geladeira compartilhada em tempo real** — geladeira sincronizada entre membros da casa via Supabase Realtime. Cadastre ingredientes, quantidades, unidades e validade.
 - 🗂️ **Sistema de 3 níveis de categoria** — Categoria → Subcategoria → Tags para filtrar exatamente o que quer cozinhar.
 - 👨‍👩‍👧 **Ajuste de porções** — informe para quantas pessoas e a IA ajusta todos os ingredientes automaticamente.
 - 📋 **Passos detalhados e profissionais** — cada passo inclui quantidades exatas, temperatura e tempo de preparo.
@@ -38,6 +38,9 @@ Cozinhei resolve isso gerando receitas sob medida, com ingredientes que você re
 - 🌐 **Integração com TheMealDB** — quando disponível, busca receitas reais do banco de dados e as traduz para português.
 - 🔄 **Gerar outras** — clique em "Gerar outras" para receber novas sugestões sem repetir as já mostradas.
 - 🍽️ **Modo de preparo guiado** — tela dedicada para seguir o passo a passo durante o cozimento.
+- 🏠 **Casa compartilhada** — crie uma casa, convide membros com código de convite e compartilhe geladeira e lista de compras em tempo real.
+- 🛒 **Lista de compras colaborativa** — adicione itens com loja, marque como comprado e mova direto para a geladeira.
+- 📋 **Histórico de atividades** — log em tempo real de tudo que acontece na geladeira: quem adicionou, editou ou removeu itens e quando.
 
 ---
 
@@ -63,7 +66,9 @@ O app organiza receitas em 3 níveis progressivos:
 | Linguagem | Dart |
 | Framework | Flutter |
 | State Management | Riverpod |
-| Banco de dados local | Drift (SQLite) |
+| Backend / Banco de dados | Supabase (PostgreSQL + Realtime) |
+| Auth | Supabase Auth (anônimo) |
+| Cache local | SharedPreferences |
 | Navegação | go_router |
 | Requisições HTTP | Dio |
 | Imagens | cached_network_image |
@@ -88,17 +93,23 @@ lib/
 │   ├── database/               # Drift: tabelas, AppDatabase
 │   └── repository/
 │       ├── recipe_repository   # Lógica central: IA, MealDB, imagens, CRUD
-│       └── fridge_repository   # Gerenciamento de ingredientes da geladeira
+│       ├── fridge_repository   # Geladeira e lista de compras (Supabase + cache)
+│       ├── house_repository    # Criação, convite e exclusão de casa compartilhada
+│       └── log_repository      # Histórico de atividades em tempo real
 ├── di/
 │   └── injection.dart          # get_it: setup de dependências
 ├── model/
 │   ├── recipe.dart             # Modelo de domínio
-│   └── recipe_filter.dart      # Categorias, subcategorias e tags
+│   ├── recipe_filter.dart      # Categorias, subcategorias e tags
+│   ├── fridge_item.dart        # Item da geladeira com quantidade, unidade e validade
+│   ├── shopping_item.dart      # Item da lista de compras com loja
+│   └── log_entry.dart          # Entrada de histórico de atividade
 ├── ui/
 │   ├── navigation/             # go_router: rotas e ShellRoute com bottom nav
 │   ├── screens/
 │   │   ├── home/               # HomeScreen (geração principal)
-│   │   ├── fridge/             # FridgeScreen
+│   │   ├── fridge/             # FridgeScreen (geladeira + compras + histórico)
+│   │   ├── house/              # HouseSetupScreen (criar/entrar em casa)
 │   │   ├── saved/              # SavedRecipesScreen
 │   │   └── recipe/             # RecipeDetailScreen + CookingModeScreen
 │   ├── theme/                  # Cores e gradientes do app
@@ -106,7 +117,8 @@ lib/
 ├── viewmodel/
 │   ├── home_notifier.dart      # Estado da home, geração, filtros
 │   ├── home_state.dart         # Classes de estado sealed
-│   ├── fridge_notifier.dart    # Ingredientes da geladeira
+│   ├── fridge_notifier.dart    # Geladeira, compras e logs (Supabase Realtime)
+│   ├── house_notifier.dart     # Estado da casa compartilhada
 │   └── saved_recipes_notifier  # Receitas salvas e favoritas
 ├── providers.dart              # Todos os providers Riverpod
 └── main.dart                   # Entrada: ProviderScope + go_router
@@ -138,7 +150,10 @@ Exibe cards com nome, tempo, foto e badge de categoria
 | Tela | Descrição |
 |---|---|
 | **Home** | Ingredientes, categorias 3 níveis, geração de receitas |
-| **Geladeira** | Cadastro de ingredientes disponíveis em casa |
+| **Geladeira** | Ingredientes com quantidade, unidade e validade — compartilhado em tempo real |
+| **Lista de Compras** | Lista colaborativa com loja, marcação e envio para geladeira |
+| **Histórico** | Log de atividades da casa com agrupamento por data |
+| **Configurações da Casa** | Renomear, convidar membros ou excluir a geladeira |
 | **Detalhe da Receita** | Ingredientes, passos detalhados, favoritar, modo preparo |
 | **Modo Preparo** | Passo a passo guiado durante o cozimento |
 | **Minhas Receitas** | Todas as receitas salvas com filtro de favoritas |
@@ -156,7 +171,7 @@ Exibe cards com nome, tempo, foto e badge de categoria
 ## ⚖️ Licença e Direitos Autorais
 
 ```
-Copyright (c) 2025 Guilherme Uriarte. Todos os direitos reservados.
+Copyright (c) 2025-2026 Guilherme Uriarte. Todos os direitos reservados.
 ```
 
 Este projeto é **software proprietário**. O código-fonte está disponível publicamente apenas para fins de avaliação e portfólio.
