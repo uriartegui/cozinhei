@@ -433,20 +433,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ]
                           : [],
                     ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.auto_awesome,
-                            color: Colors.white, size: 18),
-                        SizedBox(width: 8),
-                        Text('Gerar Receitas',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 17,
-                                letterSpacing: 0.2)),
-                      ],
-                    ),
+                    alignment: Alignment.center,
+                    child: const Text('Gerar Receitas',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 17,
+                            letterSpacing: 0.2)),
                   ),
                 ),
 
@@ -498,19 +491,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         border: Border.all(
                             color: brandOrange.withOpacity(0.5), width: 1.5),
                       ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.auto_awesome,
-                              color: brandOrange, size: 16),
-                          SizedBox(width: 8),
-                          Text('Gerar outras',
-                              style: TextStyle(
-                                  color: brandOrange,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14)),
-                        ],
-                      ),
+                      child: const Text('Gerar outras',
+                          style: TextStyle(
+                              color: brandOrange,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14)),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -1013,21 +998,15 @@ class _ServingsDialogState extends State<_ServingsDialog> {
                     ),
                   ],
                 ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.auto_awesome, color: Colors.white, size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      'Gerar Receitas',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                  ],
+                alignment: Alignment.center,
+                child: const Text(
+                  'Gerar Receitas',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    letterSpacing: -0.2,
+                  ),
                 ),
               ),
             ),

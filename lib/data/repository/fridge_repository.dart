@@ -1,51 +1,82 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../model/fridge_item.dart';
 import '../../model/shopping_item.dart';
 
 class FridgeRepository {
-  static const String _fridgeKey     = 'fridge_items_v2';
-  static const String _shoppingKey   = 'shopping_items_v1';
-  static const String _quickItemsKey = 'quick_add_items_v1';
+  final SupabaseClient _client;
   final SharedPreferences _prefs;
 
-  FridgeRepository(this._prefs);
+  static const String _quickItemsKey = 'quick_add_items_v1';
 
-  // ── Fridge ──────────────────────────────────────────────────────────────────
+  FridgeRepository(this._client, this._prefs);
 
-  List<FridgeItem> loadFridge() {
-    final json = _prefs.getString(_fridgeKey);
-    if (json == null) return [];
+  String get _userId => _client.auth.currentUser?.id ?? '';
+
+  // ── Fridge (Supabase realtime) ───────────────────────────────────────────────
+
+  Stream<List<FridgeItem>> watchFridge(String houseId) {
+    return _client
+        .from('fridge_items')
+        .stream(primaryKey: ['id'])
+        .eq('house_id', houseId)
+        .order('added_at')
+        .map((data) => data.map((e) => FridgeItem.fromSupabase(e)).toList());
+  }
+
+  Future<void> saveFridgeItem(String houseId, FridgeItem item) async {
     try {
-      final list = jsonDecode(json) as List;
-      return list.map((e) => FridgeItem.fromJson(e as Map<String, dynamic>)).toList();
-    } catch (_) {
-      return [];
+      await _client
+          .from('fridge_items')
+          .upsert(item.toSupabase(houseId, _userId));
+    } catch (e) {
+      debugPrint('❌ saveFridgeItem error: $e');
+      rethrow;
     }
   }
 
-  Future<void> saveFridge(List<FridgeItem> items) async {
-    await _prefs.setString(_fridgeKey, jsonEncode(items.map((e) => e.toJson()).toList()));
+  Future<void> deleteFridgeItem(String itemId) async {
+    await _client.from('fridge_items').delete().eq('id', itemId);
   }
 
-  // ── Shopping List ────────────────────────────────────────────────────────────
-
-  List<ShoppingItem> loadShopping() {
-    final json = _prefs.getString(_shoppingKey);
-    if (json == null) return [];
-    try {
-      final list = jsonDecode(json) as List;
-      return list.map((e) => ShoppingItem.fromJson(e as Map<String, dynamic>)).toList();
-    } catch (_) {
-      return [];
-    }
+  Future<void> updateFridgeItem(String houseId, FridgeItem item) async {
+    await _client
+        .from('fridge_items')
+        .update(item.toSupabase(houseId, _userId))
+        .eq('id', item.id);
   }
 
-  Future<void> saveShopping(List<ShoppingItem> items) async {
-    await _prefs.setString(_shoppingKey, jsonEncode(items.map((e) => e.toJson()).toList()));
+  // ── Shopping (Supabase realtime) ─────────────────────────────────────────────
+
+  Stream<List<ShoppingItem>> watchShopping(String houseId) {
+    return _client
+        .from('shopping_items')
+        .stream(primaryKey: ['id'])
+        .eq('house_id', houseId)
+        .order('added_at')
+        .map((data) => data.map((e) => ShoppingItem.fromSupabase(e)).toList());
   }
 
-  // ── Quick Add ────────────────────────────────────────────────────────────────
+  Future<void> saveShoppingItem(String houseId, ShoppingItem item) async {
+    await _client
+        .from('shopping_items')
+        .upsert(item.toSupabase(houseId, _userId));
+  }
+
+  Future<void> updateShoppingItem(String houseId, ShoppingItem item) async {
+    await _client
+        .from('shopping_items')
+        .update(item.toSupabase(houseId, _userId))
+        .eq('id', item.id);
+  }
+
+  Future<void> deleteShoppingItem(String itemId) async {
+    await _client.from('shopping_items').delete().eq('id', itemId);
+  }
+
+  // ── Quick Add (mantém local) ──────────────────────────────────────────────────
 
   Map<String, int> loadQuickItemUsage() {
     final json = _prefs.getString(_quickItemsKey);

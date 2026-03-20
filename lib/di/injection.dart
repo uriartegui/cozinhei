@@ -9,6 +9,8 @@ import '../data/repository/fridge_repository.dart';
 import '../data/repository/recipe_repository.dart';
 import '../data/repository/user_recipe_repository.dart';
 import '../data/repository/community_recipe_repository.dart';
+import '../data/repository/house_repository.dart';
+import '../data/repository/log_repository.dart';
 import '../core/constants.dart';
 
 final getIt = GetIt.instance;
@@ -32,7 +34,7 @@ Future<void> setupDependencies() async {
   );
 
   getIt.registerSingleton<FridgeRepository>(
-    FridgeRepository(prefs),
+    FridgeRepository(getIt<SupabaseClient>(), prefs),
   );
   getIt.registerSingleton<RecipeRepository>(
     RecipeRepository(
@@ -46,5 +48,11 @@ Future<void> setupDependencies() async {
   );
   getIt.registerSingleton<CommunityRecipeRepository>(
     CommunityRecipeRepository(getIt<SupabaseClient>(), getIt<GroqService>()),
+  );
+  getIt.registerSingleton<HouseRepository>(
+    HouseRepository(getIt<SupabaseClient>()),
+  );
+  getIt.registerSingleton<LogRepository>(
+    LogRepository(getIt<SupabaseClient>()),
   );
 }

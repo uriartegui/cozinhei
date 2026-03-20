@@ -1,19 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/repository/recipe_repository.dart';
-import '../data/repository/fridge_repository.dart';
 import '../data/repository/community_recipe_repository.dart';
 import '../model/recipe.dart';
 import 'home_state.dart';
 
 class HomeNotifier extends StateNotifier<HomeState> {
   final RecipeRepository _repository;
-  final FridgeRepository _fridgeRepository;
+  final List<String> Function() _getFridgeIngredients;
   final CommunityRecipeRepository _communityRepository;
   final List<String> _shownRecipeNames = [];
   final List<String> _shownFridgeNames = [];
   String _loadedFridgeKey = '';
 
-  HomeNotifier(this._repository, this._fridgeRepository, this._communityRepository)
+  HomeNotifier(this._repository, this._getFridgeIngredients, this._communityRepository)
       : super(HomeState());
 
   void onQueryChange(String value) {
@@ -105,7 +104,7 @@ class HomeNotifier extends StateNotifier<HomeState> {
   /// Chamado ao navegar para home: só recarrega se a geladeira mudou ou ainda não carregou.
   Future<void> syncFridgeSuggestions() async {
     if (state.fridgeSuggestions is FridgeSuggestionsLoading) return;
-    final ingredients = _fridgeRepository.loadFridge().map((e) => e.name).toList();
+    final ingredients = _getFridgeIngredients();
     final key = (List<String>.from(ingredients)..sort()).join(',');
     if (key == _loadedFridgeKey && state.fridgeSuggestions is FridgeSuggestionsSuccess) return;
     if (key != _loadedFridgeKey) _shownFridgeNames.clear();
@@ -113,7 +112,7 @@ class HomeNotifier extends StateNotifier<HomeState> {
   }
 
   Future<void> loadFridgeSuggestions() async {
-    final ingredients = _fridgeRepository.loadFridge().map((e) => e.name).toList();
+    final ingredients = _getFridgeIngredients();
     if (ingredients.isEmpty) {
       state = state.copyWith(fridgeSuggestions: FridgeSuggestionsEmpty());
       return;

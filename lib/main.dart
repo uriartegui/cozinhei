@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -22,14 +23,18 @@ void main() async {
   );
 }
 
-class CozinheiApp extends StatelessWidget {
+class CozinheiApp extends ConsumerWidget {
   const CozinheiApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(appRouterProvider);
     return MaterialApp.router(
       title: 'Cozinhei',
       debugShowCheckedModeBanner: false,
+      locale: const Locale('pt', 'BR'),
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      supportedLocales: const [Locale('pt', 'BR')],
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFFFF6B35),
@@ -40,7 +45,7 @@ class CozinheiApp extends StatelessWidget {
           ThemeData.light().textTheme,
         ),
       ),
-      routerConfig: appRouter,
+      routerConfig: router,
     );
   }
 }

@@ -143,6 +143,40 @@ class FridgeItem {
     );
   }
 
+  factory FridgeItem.fromSupabase(Map<String, dynamic> json) {
+    return FridgeItem(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      category: FridgeCategory.values.firstWhere(
+        (e) => e.name == json['category'],
+        orElse: () => FridgeCategory.other,
+      ),
+      addedAt: DateTime.parse(json['added_at'] as String),
+      expiresAt: json['expires_at'] != null
+          ? DateTime.parse(json['expires_at'] as String)
+          : null,
+      quantity: (json['quantity'] as num?)?.toDouble(),
+      unit: json['unit'] != null
+          ? FridgeUnit.values.firstWhere(
+              (e) => e.name == json['unit'],
+              orElse: () => FridgeUnit.un,
+            )
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toSupabase(String houseId, String addedBy) => {
+    'id': id,
+    'house_id': houseId,
+    'name': name,
+    'category': category.name,
+    'quantity': quantity,
+    'unit': unit?.name,
+    'added_at': addedAt.toIso8601String(),
+    'expires_at': expiresAt?.toIso8601String(),
+    'added_by': addedBy,
+  };
+
   FridgeItem copyWith({
     String? name,
     FridgeCategory? category,
@@ -150,6 +184,7 @@ class FridgeItem {
     bool clearExpiry = false,
     double? quantity,
     FridgeUnit? unit,
+    bool clearQuantity = false,
   }) {
     return FridgeItem(
       id: id,
@@ -157,8 +192,8 @@ class FridgeItem {
       category: category ?? this.category,
       addedAt: addedAt,
       expiresAt: clearExpiry ? null : (expiresAt ?? this.expiresAt),
-      quantity: quantity ?? this.quantity,
-      unit: unit ?? this.unit,
+      quantity: clearQuantity ? null : (quantity ?? this.quantity),
+      unit: clearQuantity ? null : (unit ?? this.unit),
     );
   }
 }
