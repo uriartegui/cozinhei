@@ -1,9 +1,33 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../model/recipe.dart';
 import '../../model/recipe_filter.dart';
 import '../../model/user_recipe.dart';
 import '../api/groq_service.dart';
+
+const _debugSessionId = 'd53d84';
+const _debugLogPath = r'C:\dev\cozinhei\debug-d53d84.log';
+
+void _agentDebugLog({
+  required String runId,
+  required String hypothesisId,
+  required String location,
+  required String message,
+  Map<String, Object?> data = const {},
+}) {
+  final payload = <String, Object?>{
+    'sessionId': _debugSessionId,
+    'runId': runId,
+    'hypothesisId': hypothesisId,
+    'location': location,
+    'message': message,
+    'data': data,
+    'timestamp': DateTime.now().millisecondsSinceEpoch,
+  };
+  final line = jsonEncode(payload);
+  File(_debugLogPath).writeAsStringSync('$line\n', mode: FileMode.append);
+}
 
 class CommunityRecipeRepository {
   final SupabaseClient _supabase;
@@ -14,6 +38,7 @@ class CommunityRecipeRepository {
   /// Busca receitas por palavras-chave; filtro de categoria server-side via RPC.
   /// Se não há ingredientes mas há categoria, busca todas da categoria.
   Future<List<Recipe>> searchByQuery(String query, {String? category}) async {
+    const runId = 'initial';
     final words = query
         .toLowerCase()
         .split(RegExp(r'[,\s]+'))
@@ -22,6 +47,20 @@ class CommunityRecipeRepository {
         .toList();
 
     // Sem ingredientes e sem categoria → nada a buscar
+    // #region agent log
+    _agentDebugLog(
+      runId: runId,
+      hypothesisId: 'H1',
+      location: 'community_recipe_repository.dart:searchByQuery',
+      message: 'parsed keywords',
+      data: {
+        'wordsCount': words.length,
+        'wordsPreview': words.take(3).join('|'),
+        'category': category,
+      },
+    );
+    // #endregion
+
     if (words.isEmpty && category == null) return [];
 
     // Sem ingredientes mas com categoria → busca todos da categoria
@@ -41,6 +80,19 @@ class CommunityRecipeRepository {
       final params = <String, dynamic>{'keyword': word};
       if (category != null) params['category_filter'] = category;
 
+      // #region agent log
+      _agentDebugLog(
+        runId: runId,
+        hypothesisId: 'H1',
+        location: 'community_recipe_repository.dart:searchByQuery',
+        message: 'supabase.rpc before',
+        data: {
+          'keyword': word,
+          'category': category,
+        },
+      );
+      // #endregion
+
       final data = await _supabase.rpc('search_community_recipes', params: params);
 
       for (final row in data as List) {
@@ -49,7 +101,22 @@ class CommunityRecipeRepository {
       }
     }
 
-    return results.take(6).map((e) => _fromRow(e)).toList();
+    final finalRecipes = results.take(6).map((e) => _fromRow(e)).toList();
+
+    // #region agent log
+    _agentDebugLog(
+      runId: runId,
+      hypothesisId: 'H5',
+      location: 'community_recipe_repository.dart:searchByQuery',
+      message: 'returning recipes',
+      data: {
+        'finalCount': finalRecipes.length,
+        'rawResults': results.length,
+      },
+    );
+    // #endregion
+
+    return finalRecipes;
   }
 
   /// Valida com Groq, categoriza automaticamente por IA e publica no Supabase

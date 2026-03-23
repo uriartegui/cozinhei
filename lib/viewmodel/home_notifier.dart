@@ -1,8 +1,33 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/repository/recipe_repository.dart';
 import '../data/repository/community_recipe_repository.dart';
 import '../model/recipe.dart';
 import 'home_state.dart';
+
+const _debugSessionId = 'd53d84';
+const _debugLogPath = r'C:\dev\cozinhei\debug-d53d84.log';
+
+void _agentDebugLog({
+  required String runId,
+  required String hypothesisId,
+  required String location,
+  required String message,
+  Map<String, Object?> data = const {},
+}) {
+  final payload = <String, Object?>{
+    'sessionId': _debugSessionId,
+    'runId': runId,
+    'hypothesisId': hypothesisId,
+    'location': location,
+    'message': message,
+    'data': data,
+    'timestamp': DateTime.now().millisecondsSinceEpoch,
+  };
+  final line = jsonEncode(payload);
+  File(_debugLogPath).writeAsStringSync('$line\n', mode: FileMode.append);
+}
 
 class HomeNotifier extends StateNotifier<HomeState> {
   final RecipeRepository _repository;
@@ -62,6 +87,23 @@ class HomeNotifier extends StateNotifier<HomeState> {
     final q = state.query.trim();
     if (q.isEmpty) return;
 
+    const runId = 'initial';
+
+    // #region agent log
+    _agentDebugLog(
+      runId: runId,
+      hypothesisId: 'H1',
+      location: 'home_notifier.dart:generateRecipes',
+      message: 'generateRecipes start',
+      data: {
+        'queryLen': q.length,
+        'chipsCount': state.chips.length,
+        'selectedCategory': state.selectedCategory,
+        'servings': servings,
+      },
+    );
+    // #endregion
+
     state = state.copyWith(uiState: HomeLoading());
     try {
       // 1. Busca na comunidade — usa só os chips de ingredientes como keyword;
@@ -74,6 +116,19 @@ class HomeNotifier extends StateNotifier<HomeState> {
       final communityRecipes = allCommunity
           .where((r) => !_shownRecipeNames.contains(r.name))
           .toList();
+
+      // #region agent log
+      _agentDebugLog(
+        runId: runId,
+        hypothesisId: 'H1',
+        location: 'home_notifier.dart:generateRecipes',
+        message: 'after community search',
+        data: {
+          'communityRecipesCount': communityRecipes.length,
+          'needed': 4 - communityRecipes.length,
+        },
+      );
+      // #endregion
 
       // 2. Completa com IA se tiver menos de 4 receitas
       final needed = 4 - communityRecipes.length;
@@ -93,8 +148,39 @@ class HomeNotifier extends StateNotifier<HomeState> {
 
       final combined = [...communityRecipes, ...aiRecipes];
       _shownRecipeNames.addAll(combined.map((r) => r.name));
+
+      // #region agent log
+      _agentDebugLog(
+        runId: runId,
+        hypothesisId: 'H2',
+        location: 'home_notifier.dart:generateRecipes',
+        message: 'after ai generation',
+        data: {
+          'aiRecipesCount': aiRecipes.length,
+          'combinedCount': combined.length,
+        },
+      );
+      // #endregion
+
       state = state.copyWith(uiState: HomeSuccess(combined));
     } catch (e) {
+      final err = e.toString();
+      final errShort = err.length > 250 ? '${err.substring(0, 250)}...' : err;
+
+      // #region agent log
+      _agentDebugLog(
+        runId: runId,
+        hypothesisId: 'H1',
+        location: 'home_notifier.dart:generateRecipes',
+        message: 'generateRecipes catch',
+        data: {
+          'errorType': e.runtimeType.toString(),
+          'error': errShort,
+          'selectedCategory': state.selectedCategory,
+        },
+      );
+      // #endregion
+
       state = state.copyWith(
         uiState: HomeError(e.toString().replaceAll('Exception: ', '')),
       );

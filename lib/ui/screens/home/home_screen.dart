@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,6 +12,29 @@ import '../../../viewmodel/home_state.dart';
 import '../../../viewmodel/home_notifier.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/recipe_card.dart';
+
+const _debugSessionId = 'd53d84';
+const _debugLogPath = r'C:\dev\cozinhei\debug-d53d84.log';
+
+void _agentDebugLog({
+  required String runId,
+  required String hypothesisId,
+  required String location,
+  required String message,
+  Map<String, Object?> data = const {},
+}) {
+  final payload = <String, Object?>{
+    'sessionId': _debugSessionId,
+    'runId': runId,
+    'hypothesisId': hypothesisId,
+    'location': location,
+    'message': message,
+    'data': data,
+    'timestamp': DateTime.now().millisecondsSinceEpoch,
+  };
+  final line = jsonEncode(payload);
+  File(_debugLogPath).writeAsStringSync('$line\n', mode: FileMode.append);
+}
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -860,12 +885,35 @@ class _ServingsDialogState extends State<_ServingsDialog> {
 
   void _submit() {
     final raw = int.tryParse(widget.controller.text.trim());
+    const runId = 'initial';
     if (raw == null || raw < 1) {
       setState(() => _error = 'Informe um número entre 1 e 100');
+
+      // #region agent log
+      _agentDebugLog(
+        runId: runId,
+        hypothesisId: 'H3',
+        location: 'home_screen.dart:_ServingsDialogState:_submit',
+        message: 'invalid servings (null or <1)',
+        data: {'raw': raw},
+      );
+      // #endregion
+
       return;
     }
     if (raw > 100) {
       setState(() => _error = 'O máximo é 100 pessoas');
+
+      // #region agent log
+      _agentDebugLog(
+        runId: runId,
+        hypothesisId: 'H3',
+        location: 'home_screen.dart:_ServingsDialogState:_submit',
+        message: 'invalid servings (>100)',
+        data: {'raw': raw},
+      );
+      // #endregion
+
       return;
     }
     setState(() => _error = null);
